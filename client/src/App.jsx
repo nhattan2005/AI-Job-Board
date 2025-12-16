@@ -1,11 +1,10 @@
 import React from 'react';
-import ProfilePage from './pages/ProfilePage';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Pages
+// Import đầy đủ các Pages & Components
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import JobList from './components/JobList';
@@ -17,23 +16,27 @@ import AllApplications from './pages/AllApplications';
 import MyApplications from './pages/MyApplications';
 import InterviewSchedulePage from './pages/InterviewSchedulePage';
 import MyInterviews from './pages/MyInterviews';
+import CareerPath from './pages/CareerPath'; // <-- Đảm bảo dòng này tồn tại
+import ProfilePage from './pages/ProfilePage'; // <-- Đảm bảo dòng này tồn tại
 
 const App = () => {
     return (
         <Router>
             <AuthProvider>
-                <div className="min-h-screen bg-gray-50">
+                <div className="min-h-screen bg-slate-50"> {/* Đổi bg-gray-50 thành bg-slate-50 cho đẹp */}
                     <Navigation />
-                    
                     <main className="container mx-auto p-6">
                         <Routes>
                             {/* Public Routes */}
-                            <Route path="/login" element={<LoginPage />} />
-                            <Route path="/register" element={<RegisterPage />} />
-                            
-                            {/* Candidate Routes */}
                             <Route path="/" element={<JobList />} />
                             <Route path="/jobs/:id" element={<JobDetail />} />
+                            <Route path="/login" element={<LoginPage />} />
+                            <Route path="/register" element={<RegisterPage />} />
+                            <Route path="/career-path" element={<CareerPath />} />
+                            
+                            {/* Protected Routes */}
+                            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                            
                             <Route 
                                 path="/my-applications" 
                                 element={
@@ -43,6 +46,15 @@ const App = () => {
                                 } 
                             />
                             
+                            <Route 
+                                path="/my-interviews" 
+                                element={
+                                    <ProtectedRoute>
+                                        <MyInterviews />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
                             {/* Employer Routes */}
                             <Route 
                                 path="/employer/dashboard" 
@@ -76,37 +88,14 @@ const App = () => {
                                     </ProtectedRoute>
                                 } 
                             />
-
-                            {/* Interview Routes */}
                             <Route 
-                                path="/interview/schedule/:applicationId" 
+                                path="/employer/jobs/:jobId/applications/:applicationId/schedule-interview" 
                                 element={
-                                    <ProtectedRoute requiredRole="candidate">
+                                    <ProtectedRoute requiredRole="employer">
                                         <InterviewSchedulePage />
                                     </ProtectedRoute>
                                 } 
                             />
-                            <Route 
-                                path="/my-interviews" 
-                                element={
-                                    <ProtectedRoute>
-                                        <MyInterviews />
-                                    </ProtectedRoute>
-                                } 
-                            />
-                            
-                            {/* Profile Route */}
-                            <Route 
-                                path="/profile" 
-                                element={
-                                    <ProtectedRoute>
-                                        <ProfilePage />
-                                    </ProtectedRoute>
-                                } 
-                            />
-
-                            {/* 404 */}
-                            <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </main>
                 </div>

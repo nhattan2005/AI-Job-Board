@@ -5,11 +5,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const tailorCV = async (cvText, jobDescription) => {
     try {
-        console.log('Initializing Gemini model: gemini-2.0-flash-exp');
+        console.log('Initializing Gemini model: gemini-2.5-flash');
         
         // Initialize the model
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.0-flash-exp"
+            model: "gemini-2.5-flash" 
         });
 
         const prompt = `You are a professional career coach and CV optimization expert.
@@ -17,7 +17,7 @@ const tailorCV = async (cvText, jobDescription) => {
 Analyze this CV against the job description and provide specific, actionable advice.
 
 CV Content:
-${cvText}
+${cvText.substring(0, 2000)}  // ← GIỚI HẠN 2000 ký tự để tiết kiệm tokens
 
 Job Description:
 ${jobDescription}
@@ -41,12 +41,9 @@ Focus on:
         let text = response.text();
 
         console.log('Received response from Gemini');
-        console.log('Raw response preview:', text.substring(0, 200));
 
         // Clean up response - remove markdown code blocks if present
         text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-        console.log('Cleaned response preview:', text.substring(0, 200));
 
         // Parse JSON
         let analysis;
@@ -55,7 +52,6 @@ Focus on:
             console.log('✓ JSON parsed successfully');
         } catch (parseError) {
             console.error('❌ JSON parse error:', parseError.message);
-            console.error('Failed text:', text);
             throw new Error('Invalid JSON response from AI');
         }
 
@@ -68,7 +64,17 @@ Focus on:
     } catch (error) {
         console.error('❌ CV tailoring error:', error);
         
-        // Return fallback structure if parsing fails
+        // Handle quota exceeded error
+        if (error.status === 429) {
+            return {
+                missingKeywords: [],
+                missingSkills: [],
+                suggestions: ['⏰ API quota exceeded. Please wait 1 minute and try again.'],
+                improvements: []
+            };
+        }
+        
+        // Return fallback structure
         return {
             missingKeywords: [],
             missingSkills: [],

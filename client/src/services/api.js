@@ -1,51 +1,40 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// Tạo instance của axios
+const api = axios.create({
+    // Tự động lấy URL từ biến môi trường hoặc dùng localhost:5000
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
 
-export const postJob = async (jobData) => {
-    try {
-        const response = await axios.post(`${API_BASE_URL}/jobs`, jobData);
-        return response.data;
-    } catch (error) {
-        throw error;
+// Interceptor: Tự động gắn Token vào mỗi request nếu đã đăng nhập
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
     }
-};
+);
 
-export const getJobs = async () => {
-    try {
-        const response = await axios.get(`${API_BASE_URL}/jobs`);
-        return response.data;
-    } catch (error) {
-        throw error;
+// Interceptor: Xử lý lỗi trả về (ví dụ: hết hạn token)
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            // Nếu token hết hạn hoặc không hợp lệ, có thể logout (tuỳ chọn)
+            // localStorage.removeItem('token');
+            // window.location.href = '/login';
+        }
+        return Promise.reject(error);
     }
-};
+);
 
-export const uploadCV = async (formData) => {
-    try {
-        const response = await axios.post(`${API_BASE_URL}/cvs`, formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
-};
-
-export const tailorCV = async (cvText, jobDescription) => {
-    try {
-        const response = await axios.post(`${API_BASE_URL}/tailor-cv`, {
-            cvText,
-            jobDescription,
-        });
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
-};
-
-export const getMatchingScore = async (cvVector, jobVector) => {
-    // This function can be implemented if needed for direct matching score retrieval
-    // Currently, matching score is calculated on the server side
-};
+// QUAN TRỌNG: Phải có dòng này để sửa lỗi "does not provide an export named default"
+export default api;

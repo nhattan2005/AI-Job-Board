@@ -49,17 +49,36 @@ const MyApplications = () => {
 
     return (
         <div className="max-w-5xl mx-auto">
-            <div className="mb-8">
+            {/* Header */}
+            <div className="mb-6">
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">My Applications</h1>
-                <p className="text-gray-600">Track the status of your job applications</p>
+                <p className="text-gray-600">
+                    Track your job applications and their status
+                </p>
             </div>
 
-            {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-                    {error}
+            {/* ✅ THÊM CAREER PATH PROMO */}
+            <div className="mb-6 bg-gradient-to-r from-purple-100 to-blue-100 rounded-lg p-4 border border-purple-200">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                        <svg className="h-8 w-8 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <div>
+                            <p className="font-bold text-gray-900">💡 Want to level up your career?</p>
+                            <p className="text-sm text-gray-700">Get AI-powered career roadmap & skill gap analysis</p>
+                        </div>
+                    </div>
+                    <Link
+                        to="/career-path"
+                        className="bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition whitespace-nowrap"
+                    >
+                        Try Career Path AI →
+                    </Link>
                 </div>
-            )}
+            </div>
 
+            {/* Applications List */}
             {applications.length === 0 ? (
                 <div className="bg-white rounded-lg shadow-md p-12 text-center">
                     <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

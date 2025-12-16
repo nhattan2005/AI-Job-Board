@@ -7,6 +7,7 @@ const jobRoutes = require('./routes/jobRoutes');
 const cvRoutes = require('./routes/cvRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const careerRoutes = require('./routes/careerRoutes');
 const employerRoutes = require('./routes/employerRoutes');
 const employerEmailRoutes = require('./routes/employerEmailRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
@@ -27,12 +28,12 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
-app.use('/api/cv', cvRoutes);
 app.use('/api/applications', applicationRoutes);
+app.use('/api/cv', cvRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/employer', employerRoutes);
-app.use('/api/employer', employerEmailRoutes);
 app.use('/api/interviews', interviewRoutes);
+app.use('/api/career', careerRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

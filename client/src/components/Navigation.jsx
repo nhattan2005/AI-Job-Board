@@ -1,115 +1,100 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navigation = () => {
-    const { user, logout, isAuthenticated, isEmployer, isCandidate } = useAuth();
-    const [showUserMenu, setShowUserMenu] = useState(false);
+    const { user, logout, isAuthenticated, isCandidate, isEmployer } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [scrolled, setScrolled] = useState(false);
+
+    // Hiệu ứng khi cuộn trang
+    useEffect(() => {
+        const handleScroll = () => setScrolled(window.scrollY > 20);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
-    return (
-        <nav className="bg-blue-600 text-white shadow-lg">
-            <div className="container mx-auto px-4">
-                <div className="flex justify-between items-center h-16">
-                    {/* Logo */}
-                    <Link to="/" className="flex items-center space-x-2">
-                        <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-2xl font-bold">AI Job Board</span>
-                    </Link>
+    const isActive = (path) => location.pathname === path;
 
-                    {/* Navigation Links */}
-                    <div className="flex items-center space-x-6">
+    const NavLink = ({ to, children }) => (
+        <Link 
+            to={to} 
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                isActive(to) 
+                ? 'bg-primary-50 text-primary-700' 
+                : 'text-slate-600 hover:text-primary-600 hover:bg-slate-50'
+            }`}
+        >
+            {children}
+        </Link>
+    );
+
+    return (
+        <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+            scrolled ? 'bg-white/80 backdrop-blur-md shadow-sm border-b border-slate-200/50' : 'bg-white border-b border-slate-100'
+        }`}>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between h-16">
+                    {/* Logo */}
+                    <div className="flex items-center">
+                        <Link to="/" className="flex items-center gap-2 group">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-600 to-secondary-600 flex items-center justify-center text-white font-bold text-lg shadow-glow group-hover:scale-110 transition-transform">
+                                AI
+                            </div>
+                            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600">
+                                JobBoard
+                            </span>
+                        </Link>
+                    </div>
+
+                    {/* Desktop Menu */}
+                    <div className="hidden md:flex items-center space-x-2">
                         {isAuthenticated ? (
                             <>
-                                {/* Role-specific Links */}
                                 {isCandidate && (
                                     <>
-                                        <Link to="/" className="hover:text-gray-200 transition font-medium">
-                                            Browse Jobs
-                                        </Link>
-                                        <Link to="/my-applications" className="hover:text-gray-200 transition font-medium">
-                                            My Applications
-                                        </Link>
-                                        {/* THÊM DÒNG NÀY */}
-                                        <Link to="/my-interviews" className="hover:text-gray-200 transition font-medium">
-                                            My Interviews
+                                        <NavLink to="/">Browse Jobs</NavLink>
+                                        <NavLink to="/my-applications">Applications</NavLink>
+                                        <NavLink to="/my-interviews">Interviews</NavLink>
+                                        <Link to="/career-path" className="ml-2 px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-primary-600 to-secondary-600 hover:shadow-lg hover:shadow-primary-500/30 transition-all hover:-translate-y-0.5">
+                                            🚀 Career AI
                                         </Link>
                                     </>
                                 )}
-
                                 {isEmployer && (
                                     <>
-                                        <Link to="/employer/dashboard" className="hover:text-gray-200 transition font-medium">
-                                            Dashboard
-                                        </Link>
-                                        <Link to="/employer/post-job" className="hover:text-gray-200 transition font-medium">
-                                            Post Job
-                                        </Link>
-                                        {/* THÊM DÒNG NÀY */}
-                                        <Link to="/my-interviews" className="hover:text-gray-200 transition font-medium">
-                                            Interviews
-                                        </Link>
+                                        <NavLink to="/employer/dashboard">Dashboard</NavLink>
+                                        <NavLink to="/employer/post-job">Post Job</NavLink>
+                                        <NavLink to="/my-interviews">Interviews</NavLink>
                                     </>
                                 )}
-
-                                {/* User Menu */}
-                                <div className="relative">
-                                    <button
-                                        onClick={() => setShowUserMenu(!showUserMenu)}
-                                        className="flex items-center space-x-2 hover:text-gray-200 transition"
-                                    >
-                                        <div className="h-8 w-8 rounded-full bg-blue-700 flex items-center justify-center">
-                                            <span className="text-sm font-semibold">
-                                                {user?.email?.charAt(0).toUpperCase()}
-                                            </span>
+                                
+                                <div className="h-6 w-px bg-slate-200 mx-2"></div>
+                                
+                                <div className="flex items-center gap-3 ml-2">
+                                    <Link to="/profile" className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-primary-600 transition">
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-primary-600 font-bold border border-slate-200">
+                                            {user?.full_name?.[0] || user?.company_name?.[0] || 'U'}
                                         </div>
-                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                        </svg>
+                                    </Link>
+                                    <button onClick={handleLogout} className="text-sm font-medium text-slate-500 hover:text-red-600 transition">
+                                        Logout
                                     </button>
-
-                                    {/* User Menu Dropdown */}
-                                    {showUserMenu && (
-                                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
-                                            {/* THÊM DÒNG NÀY */}
-                                            <Link
-                                                to="/profile"
-                                                className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
-                                                onClick={() => setShowUserMenu(false)}
-                                            >
-                                                Profile
-                                            </Link>
-                                            
-                                            <button
-                                                onClick={() => {
-                                                    logout();
-                                                    setShowUserMenu(false);
-                                                }}
-                                                className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
-                                            >
-                                                Logout
-                                            </button>
-                                        </div>
-                                    )}
                                 </div>
                             </>
                         ) : (
                             <>
-                                <Link to="/login" className="hover:text-gray-200 transition font-medium">
+                                <Link to="/login" className="px-5 py-2 text-sm font-semibold text-slate-600 hover:text-primary-600 transition">
                                     Login
                                 </Link>
-                                <Link
-                                    to="/register"
-                                    className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition"
-                                >
-                                    Sign Up
+                                <Link to="/register" className="px-5 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition shadow-lg shadow-slate-900/20">
+                                    Get Started
                                 </Link>
                             </>
                         )}
