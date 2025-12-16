@@ -1,13 +1,5 @@
 # 🚀 AI-Powered IT Job Board
 
-A modern, full-stack job board platform that leverages AI to match job seekers with perfect opportunities. Built with the PERN stack (PostgreSQL, Express, React, Node.js) and integrated with Google's Gemini AI for intelligent CV analysis and job matching.
-
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen)
-![React](https://img.shields.io/badge/react-18.3.1-blue)
-
-# 🚀 AI-Powered IT Job Board
-
 Nền tảng tuyển dụng IT hiện đại tích hợp trí tuệ nhân tạo (Google Gemini AI) giúp kết nối ứng viên và nhà tuyển dụng một cách thông minh. Hệ thống không chỉ đăng tin tuyển dụng mà còn tự động phân tích CV, tính điểm phù hợp và gợi ý lộ trình nghề nghiệp cho ứng viên.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
