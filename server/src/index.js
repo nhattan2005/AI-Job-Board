@@ -8,6 +8,8 @@ const cvRoutes = require('./routes/cvRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const employerRoutes = require('./routes/employerRoutes');
+const employerEmailRoutes = require('./routes/employerEmailRoutes');
+const interviewRoutes = require('./routes/interviewRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const db = require('./config/database');
 
@@ -29,6 +31,8 @@ app.use('/api/cv', cvRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/employer', employerRoutes);
+app.use('/api/employer', employerEmailRoutes);
+app.use('/api/interviews', interviewRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

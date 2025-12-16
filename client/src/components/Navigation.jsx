@@ -37,9 +37,13 @@ const Navigation = () => {
                                         <Link to="/my-applications" className="hover:text-gray-200 transition font-medium">
                                             My Applications
                                         </Link>
+                                        {/* THÊM DÒNG NÀY */}
+                                        <Link to="/my-interviews" className="hover:text-gray-200 transition font-medium">
+                                            My Interviews
+                                        </Link>
                                     </>
                                 )}
-                                
+
                                 {isEmployer && (
                                     <>
                                         <Link to="/employer/dashboard" className="hover:text-gray-200 transition font-medium">
@@ -47,6 +51,10 @@ const Navigation = () => {
                                         </Link>
                                         <Link to="/employer/post-job" className="hover:text-gray-200 transition font-medium">
                                             Post Job
+                                        </Link>
+                                        {/* THÊM DÒNG NÀY */}
+                                        <Link to="/my-interviews" className="hover:text-gray-200 transition font-medium">
+                                            Interviews
                                         </Link>
                                     </>
                                 )}
@@ -67,24 +75,24 @@ const Navigation = () => {
                                         </svg>
                                     </button>
 
+                                    {/* User Menu Dropdown */}
                                     {showUserMenu && (
                                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50">
-                                            <div className="px-4 py-2 border-b border-gray-200">
-                                                <p className="text-sm text-gray-700 font-semibold">
-                                                    {user?.full_name || user?.company_name}
-                                                </p>
-                                                <p className="text-xs text-gray-500">{user?.email}</p>
-                                            </div>
+                                            {/* THÊM DÒNG NÀY */}
                                             <Link
                                                 to="/profile"
-                                                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                className="block px-4 py-2 text-gray-700 hover:bg-gray-100"
                                                 onClick={() => setShowUserMenu(false)}
                                             >
                                                 Profile
                                             </Link>
+                                            
                                             <button
-                                                onClick={handleLogout}
-                                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                                                onClick={() => {
+                                                    logout();
+                                                    setShowUserMenu(false);
+                                                }}
+                                                className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
                                             >
                                                 Logout
                                             </button>

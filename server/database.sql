@@ -1,10 +1,15 @@
 -- SQL script to set up the database for the AI-Powered IT Job Board
 
--- Drop existing tables if recreating
+-- Drop existing tables if recreating (in correct order - children first)
+DROP TABLE IF EXISTS interview_time_slots CASCADE;
+DROP TABLE IF EXISTS interviews CASCADE;
 DROP TABLE IF EXISTS applications CASCADE;
 DROP TABLE IF EXISTS cvs CASCADE;
 DROP TABLE IF EXISTS jobs CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+
+-- Drop the enum type if it exists
+DROP TYPE IF EXISTS user_role CASCADE;
 
 -- Enable the pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -30,6 +35,8 @@ CREATE TABLE users (
     website VARCHAR(255),
     company_email VARCHAR(255),
     company_phone VARCHAR(50),
+    
+    phone VARCHAR(20),  -- ← THÊM DÒNG NÀY
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -85,7 +92,7 @@ CREATE TABLE applications (
     match_score DECIMAL(5,2), -- 0.00 to 100.00
     ai_advice TEXT[], -- Array of advice strings
     
-    status VARCHAR(20) DEFAULT 'pending', -- pending, reviewed, rejected, accepted
+    status VARCHAR(20) DEFAULT 'pending', -- pending, reviewed, rejected, accepted, interview_scheduled, interview_confirmed
     cover_letter TEXT,
     
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -95,15 +102,56 @@ CREATE TABLE applications (
     CONSTRAINT unique_application UNIQUE (job_id, candidate_id)
 );
 
--- Create indexes for performance
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_jobs_employer ON jobs(employer_id);
-CREATE INDEX idx_jobs_status ON jobs(status);
-CREATE INDEX idx_applications_job ON applications(job_id);
-CREATE INDEX idx_applications_candidate ON applications(candidate_id);
-CREATE INDEX idx_applications_status ON applications(status);
-CREATE INDEX idx_cvs_candidate ON cvs(candidate_id);
+-- Add interview scheduling tables
+
+-- Table to store interview schedules
+CREATE TABLE interviews (
+    id SERIAL PRIMARY KEY,
+    application_id INT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+    job_id INT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    employer_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    candidate_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Interview details
+    interview_date TIMESTAMP,
+    duration_minutes INT DEFAULT 60,
+    location VARCHAR(255), -- 'Online', 'Office', or specific address
+    meeting_link VARCHAR(500), -- Zoom/Meet link
+    notes TEXT,
+    
+    -- Status tracking
+    status VARCHAR(50) DEFAULT 'pending', -- pending, confirmed, completed, cancelled, rescheduled
+    
+    -- Timestamps
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at TIMESTAMP,
+    
+    CONSTRAINT unique_application_interview UNIQUE(application_id)
+);
+
+-- Table to store available time slots offered by employer
+CREATE TABLE interview_time_slots (
+    id SERIAL PRIMARY KEY,
+    interview_id INT NOT NULL REFERENCES interviews(id) ON DELETE CASCADE,
+    slot_date TIMESTAMP NOT NULL,
+    is_selected BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_jobs_employer ON jobs(employer_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
+CREATE INDEX IF NOT EXISTS idx_applications_candidate ON applications(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_cvs_candidate ON cvs(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_interviews_application ON interviews(application_id);
+CREATE INDEX IF NOT EXISTS idx_interviews_status ON interviews(status);
+CREATE INDEX IF NOT EXISTS idx_interviews_date ON interviews(interview_date);
+CREATE INDEX IF NOT EXISTS idx_time_slots_interview ON interview_time_slots(interview_id);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -115,28 +163,76 @@ END;
 $$ language 'plpgsql';
 
 -- Apply trigger to users and jobs tables
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_jobs_updated_at ON jobs;
 CREATE TRIGGER update_jobs_updated_at BEFORE UPDATE ON jobs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_interviews_updated_at ON interviews;
+CREATE TRIGGER update_interviews_updated_at 
+    BEFORE UPDATE ON interviews
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Insert sample data for testing
 -- Password for all test users: "password123" (hashed with bcrypt)
--- Hash generated with: bcrypt.hashSync('password123', 10)
+-- Hash: $2a$10$XqJz5KqHKJ5KqHKJ5KqHKuYP2h8fH8fH8fH8fH8fH8fH8fH8fH8fH
 
 -- Sample Employers
 INSERT INTO users (email, password_hash, role, company_name, company_description, website) VALUES
-('employer1@example.com', '$2b$10$rZ7qKY5Z5Z5Z5Z5Z5Z5Z5u', 'employer', 'TechCorp Inc', 'Leading tech company specializing in AI solutions', 'https://techcorp.example.com'),
-('employer2@example.com', '$2b$10$rZ7qKY5Z5Z5Z5Z5Z5Z5Z5u', 'employer', 'StartupHub', 'Innovative startup building the future', 'https://startuphub.example.com');
+('employer1@example.com', '$2a$10$XqJz5KqHKJ5KqHKJ5KqHKuYP2h8fH8fH8fH8fH8fH8fH8fH8fH8fH', 'employer', 'TechCorp Inc', 'Leading tech company specializing in AI solutions', 'https://techcorp.example.com'),
+('employer2@example.com', '$2a$10$XqJz5KqHKJ5KqHKJ5KqHKuYP2h8fH8fH8fH8fH8fH8fH8fH8fH8fH', 'employer', 'StartupHub', 'Innovative startup building the future', 'https://startuphub.example.com')
+ON CONFLICT (email) DO NOTHING;
 
 -- Sample Candidates
 INSERT INTO users (email, password_hash, role, full_name, bio, skills) VALUES
-('candidate1@example.com', '$2b$10$rZ7qKY5Z5Z5Z5Z5Z5Z5Z5u', 'candidate', 'John Doe', 'Full-stack developer with 5 years experience', ARRAY['JavaScript', 'React', 'Node.js', 'PostgreSQL']),
-('candidate2@example.com', '$2b$10$rZ7qKY5Z5Z5Z5Z5Z5Z5Z5u', 'candidate', 'Jane Smith', 'Senior frontend developer passionate about UX', ARRAY['React', 'Vue', 'TypeScript', 'CSS', 'Figma']);
+('candidate1@example.com', '$2a$10$XqJz5KqHKJ5KqHKJ5KqHKuYP2h8fH8fH8fH8fH8fH8fH8fH8fH8fH', 'candidate', 'John Doe', 'Full-stack developer with 5 years experience', ARRAY['JavaScript', 'React', 'Node.js', 'PostgreSQL']),
+('candidate2@example.com', '$2a$10$XqJz5KqHKJ5KqHKJ5KqHKuYP2h8fH8fH8fH8fH8fH8fH8fH8fH8fH', 'candidate', 'Jane Smith', 'Senior frontend developer passionate about UX', ARRAY['React', 'Vue', 'TypeScript', 'CSS', 'Figma'])
+ON CONFLICT (email) DO NOTHING;
 
 -- Sample Jobs
 INSERT INTO jobs (employer_id, title, description, location, salary_range, employment_type, status) VALUES
 (1, 'Senior Full Stack Developer', 'We are looking for an experienced full-stack developer proficient in React, Node.js, and PostgreSQL. Must have 5+ years of experience.', 'San Francisco, CA', '$120k - $180k', 'full-time', 'active'),
 (1, 'Frontend Developer', 'Join our team to build amazing user interfaces with React and modern CSS.', 'Remote', '$90k - $130k', 'full-time', 'active'),
-(2, 'Backend Engineer', 'Looking for a backend expert in Node.js, Express, and database design.', 'New York, NY', '$100k - $150k', 'full-time', 'active');
+(2, 'Backend Engineer', 'Looking for a backend expert in Node.js, Express, and database design.', 'New York, NY', '$100k - $150k', 'full-time', 'active')
+ON CONFLICT DO NOTHING;
+
+-- Sample CVs
+INSERT INTO cvs (candidate_id, filename, cv_text) VALUES
+(1, 'john_doe_cv.pdf', 'John Doe\nFull-stack developer with 5 years experience...\nSkills: JavaScript, React, Node.js, PostgreSQL'),
+(2, 'jane_smith_cv.pdf', 'Jane Smith\nSenior frontend developer passionate about UX...\nSkills: React, Vue, TypeScript, CSS, Figma')
+ON CONFLICT (candidate_id) DO NOTHING;
+
+-- Sample Applications
+INSERT INTO applications (job_id, candidate_id, cv_id, match_score, ai_advice, status, cover_letter) VALUES
+(1, 1, 1, 85.5, ARRAY['Highlight leadership experience', 'Emphasize project outcomes'], 'pending', 'Excited about the opportunity...'),
+(2, 2, 2, 90.0, ARRAY['Showcase portfolio of designs', 'Mention teamwork in projects'], 'pending', 'I believe my skills...')
+ON CONFLICT (job_id, candidate_id) DO NOTHING;
+
+-- Sample Interviews
+INSERT INTO interviews (application_id, job_id, employer_id, candidate_id, interview_date, duration_minutes, location, meeting_link, notes, status) VALUES
+(1, 1, 1, 1, '2024-12-20 10:00:00', 60, 'Online', 'https://zoom.us/j/1234567890', 'Initial screening interview', 'pending'),
+(2, 2, 2, 2, '2024-12-21 14:00:00', 45, 'Office', NULL, 'Technical interview with the team', 'pending')
+ON CONFLICT (application_id) DO NOTHING;
+
+-- Sample Interview Time Slots
+INSERT INTO interview_time_slots (interview_id, slot_date, is_selected) VALUES
+(1, '2024-12-20 10:00:00', FALSE),
+(1, '2024-12-20 11:00:00', TRUE),
+(1, '2024-12-20 14:00:00', FALSE),
+(2, '2024-12-21 14:00:00', FALSE),
+(2, '2024-12-21 15:00:00', TRUE)
+ON CONFLICT DO NOTHING;
+
+-- Success message
+DO $$ 
+BEGIN 
+    RAISE NOTICE '✅ Database schema created successfully!';
+    RAISE NOTICE '📝 Sample data inserted';
+    RAISE NOTICE '👤 Test accounts:';
+    RAISE NOTICE '   Employer: employer1@example.com / password123';
+    RAISE NOTICE '   Candidate: candidate1@example.com / password123';
+END $$;

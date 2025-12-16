@@ -2,35 +2,22 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
-// Generate JWT token
-const generateToken = (userId, role) => {
-    return jwt.sign(
-        { userId, role },
-        process.env.JWT_SECRET,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
-};
-
 // Register new user
 const register = async (req, res) => {
     try {
-        const { email, password, role, ...roleSpecificData } = req.body;
+        const { email, password, role, phone } = req.body;
 
-        // Validation
-        if (!email || !password || !role) {
-            return res.status(400).json({ error: 'Email, password, and role are required' });
+        // Validate required fields
+        if (!email || !password || !role || !phone) {
+            return res.status(400).json({ error: 'Email, password, role, and phone are required' });
         }
 
-        if (!['candidate', 'employer'].includes(role)) {
-            return res.status(400).json({ error: 'Role must be either "candidate" or "employer"' });
+        if (role !== 'candidate' && role !== 'employer') {
+            return res.status(400).json({ error: 'Invalid role. Must be candidate or employer' });
         }
 
         // Check if user already exists
-        const existingUser = await db.query(
-            'SELECT id FROM users WHERE email = $1',
-            [email]
-        );
-
+        const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [email]);
         if (existingUser.rows.length > 0) {
             return res.status(400).json({ error: 'Email already registered' });
         }
@@ -41,57 +28,50 @@ const register = async (req, res) => {
         let result;
 
         if (role === 'candidate') {
-            const { full_name, bio, skills } = roleSpecificData;
+            const { full_name, bio, skills } = req.body;
             
             if (!full_name) {
                 return res.status(400).json({ error: 'Full name is required for candidates' });
             }
 
             result = await db.query(
-                `INSERT INTO users (email, password_hash, role, full_name, bio, skills) 
-                 VALUES ($1, $2, $3, $4, $5, $6) 
-                 RETURNING id, email, role, full_name, bio, skills, created_at`,
-                [email, passwordHash, role, full_name, bio || '', skills || []]
+                `INSERT INTO users (email, password_hash, role, full_name, bio, skills, phone) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7) 
+                 RETURNING id, email, role, full_name, bio, skills, phone, created_at`,
+                [email, passwordHash, role, full_name, bio || '', skills || [], phone]
             );
         } else {
-            const { company_name, company_description, website } = roleSpecificData;
+            const { company_name, company_description, website } = req.body;
             
             if (!company_name) {
                 return res.status(400).json({ error: 'Company name is required for employers' });
             }
 
             result = await db.query(
-                `INSERT INTO users (email, password_hash, role, company_name, company_description, website) 
-                 VALUES ($1, $2, $3, $4, $5, $6) 
-                 RETURNING id, email, role, company_name, company_description, website, created_at`,
-                [email, passwordHash, role, company_name, company_description || '', website || '']
+                `INSERT INTO users (email, password_hash, role, company_name, company_description, website, phone) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7) 
+                 RETURNING id, email, role, company_name, company_description, website, phone, created_at`,
+                [email, passwordHash, role, company_name, company_description || '', website || '', phone]
             );
         }
 
         const user = result.rows[0];
-        const token = generateToken(user.id, user.role);
+
+        // Generate JWT token - FIXED
+        const token = jwt.sign(
+            { userId: user.id, email: user.email, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        );
 
         res.status(201).json({
             message: 'User registered successfully',
             token,
-            user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                ...(role === 'candidate' ? {
-                    full_name: user.full_name,
-                    bio: user.bio,
-                    skills: user.skills
-                } : {
-                    company_name: user.company_name,
-                    company_description: user.company_description,
-                    website: user.website
-                })
-            }
+            user
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Registration failed', details: error.message });
+        res.status(500).json({ error: 'Failed to register user' });
     }
 };
 
@@ -104,63 +84,47 @@ const login = async (req, res) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        // Find user
-        const result = await db.query(
-            `SELECT id, email, password_hash, role, full_name, bio, skills, 
-                    company_name, company_description, website 
-             FROM users WHERE email = $1`,
-            [email]
-        );
-
+        const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
         const user = result.rows[0];
 
-        // Verify password
-        const isValidPassword = await bcrypt.compare(password, user.password_hash);
-
-        if (!isValidPassword) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+        const isValid = await bcrypt.compare(password, user.password_hash);
+        
+        if (!isValid) {
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        // Generate token
-        const token = generateToken(user.id, user.role);
+        // Generate JWT token - FIXED
+        const token = jwt.sign(
+            { userId: user.id, email: user.email, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        );
+
+        delete user.password_hash;
 
         res.json({
             message: 'Login successful',
             token,
-            user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                ...(user.role === 'candidate' ? {
-                    full_name: user.full_name,
-                    bio: user.bio,
-                    skills: user.skills
-                } : {
-                    company_name: user.company_name,
-                    company_description: user.company_description,
-                    website: user.website
-                })
-            }
+            user
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Login failed', details: error.message });
+        res.status(500).json({ error: 'Failed to login' });
     }
 };
 
-// Get current user profile
+// Get user profile
 const getProfile = async (req, res) => {
     try {
         const userId = req.user.id;
 
         const result = await db.query(
-            `SELECT id, email, role, full_name, bio, skills, 
-                    company_name, company_description, website, created_at 
-             FROM users WHERE id = $1`,
+            'SELECT id, email, role, full_name, bio, skills, company_name, company_description, website, phone, created_at FROM users WHERE id = $1',
             [userId]
         );
 
@@ -168,33 +132,98 @@ const getProfile = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        const user = result.rows[0];
-
-        res.json({
-            user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                created_at: user.created_at,
-                ...(user.role === 'candidate' ? {
-                    full_name: user.full_name,
-                    bio: user.bio,
-                    skills: user.skills
-                } : {
-                    company_name: user.company_name,
-                    company_description: user.company_description,
-                    website: user.website
-                })
-            }
-        });
+        res.json({ user: result.rows[0] });
     } catch (error) {
         console.error('Get profile error:', error);
-        res.status(500).json({ error: 'Failed to fetch profile' });
+        res.status(500).json({ error: 'Failed to get profile' });
+    }
+};
+
+// Update user profile
+const updateProfile = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const userRole = req.user.role;
+        const { phone, full_name, bio, skills, company_name, company_description, website } = req.body;
+
+        let result;
+
+        if (userRole === 'candidate') {
+            result = await db.query(
+                `UPDATE users 
+                 SET phone = $1, full_name = $2, bio = $3, skills = $4, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $5
+                 RETURNING id, email, role, full_name, bio, skills, phone, created_at`,
+                [phone, full_name, bio || '', skills || [], userId]
+            );
+        } else {
+            result = await db.query(
+                `UPDATE users 
+                 SET phone = $1, company_name = $2, company_description = $3, website = $4, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $5
+                 RETURNING id, email, role, company_name, company_description, website, phone, created_at`,
+                [phone, company_name, company_description || '', website || '', userId]
+            );
+        }
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Update profile error:', error);
+        res.status(500).json({ error: 'Failed to update profile' });
+    }
+};
+
+// Change password
+const changePassword = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current password and new password are required' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        }
+
+        // Get current password hash
+        const result = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Verify current password
+        const isValid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+        
+        if (!isValid) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        // Hash new password
+        const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+        // Update password
+        await db.query(
+            'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [newPasswordHash, userId]
+        );
+
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'Failed to change password' });
     }
 };
 
 module.exports = {
     register,
     login,
-    getProfile
+    getProfile,
+    updateProfile,
+    changePassword
 };

@@ -14,7 +14,7 @@ const verifyToken = async (req, res, next) => {
         
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
-        // Fetch user from database
+        // FIXED: Đổi decoded.id thành decoded.userId
         const result = await db.query(
             'SELECT id, email, role, full_name, company_name FROM users WHERE id = $1',
             [decoded.userId]

@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import EmailTemplateModal from '../components/EmailTemplateModal';
+import InterviewInvitationModal from '../components/InterviewInvitationModal';
 
 const EmployerApplications = () => {
     const { jobId } = useParams();
@@ -9,7 +11,11 @@ const EmployerApplications = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [filter, setFilter] = useState('all');
-    const [viewingCV, setViewingCV] = useState(null); // For CV modal
+    const [viewingCV, setViewingCV] = useState(null);
+    const [selectedApplications, setSelectedApplications] = useState([]);
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
+    const [selectedApplicationForInterview, setSelectedApplicationForInterview] = useState(null);
 
     useEffect(() => {
         fetchJobAndApplications();
@@ -18,7 +24,6 @@ const EmployerApplications = () => {
     const fetchJobAndApplications = async () => {
         try {
             setLoading(true);
-            
             const jobResponse = await axios.get(`/api/jobs/${jobId}`);
             setJob(jobResponse.data);
             
@@ -44,8 +49,12 @@ const EmployerApplications = () => {
         }
     };
 
+    const openInterviewModal = (app) => {
+        setSelectedApplicationForInterview(app);
+        setIsInterviewModalOpen(true);
+    };
+
     const downloadCV = (app) => {
-        // Create a Blob from CV text
         const blob = new Blob([app.cv_text], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -67,6 +76,10 @@ const EmployerApplications = () => {
                 return 'bg-green-100 text-green-800 border-green-200';
             case 'rejected':
                 return 'bg-red-100 text-red-800 border-red-200';
+            case 'interview_scheduled':
+                return 'bg-purple-100 text-purple-800 border-purple-200';
+            case 'interview_confirmed':
+                return 'bg-indigo-100 text-indigo-800 border-indigo-200';
             default:
                 return 'bg-gray-100 text-gray-800 border-gray-200';
         }
@@ -81,6 +94,20 @@ const EmployerApplications = () => {
     const filteredApplications = applications.filter(app => 
         filter === 'all' ? true : app.status === filter
     );
+
+    const toggleSelect = (appId) => {
+        setSelectedApplications(prev => {
+            if (prev.includes(appId)) return prev.filter(id => id !== appId);
+            return [...prev, appId];
+        });
+    };
+
+    const selectAllVisible = () => {
+        const visibleIds = filteredApplications.map(a => a.id);
+        setSelectedApplications(visibleIds);
+    };
+
+    const clearSelection = () => setSelectedApplications([]);
 
     if (loading) {
         return (
@@ -101,7 +128,7 @@ const EmployerApplications = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-5xl mx-auto">
             {/* Header */}
             <div className="mb-6">
                 <Link
@@ -123,7 +150,7 @@ const EmployerApplications = () => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-6">
                 <div className="bg-white rounded-lg shadow p-4">
                     <p className="text-2xl font-bold text-gray-800">{applications.length}</p>
                     <p className="text-sm text-gray-600">Total</p>
@@ -139,6 +166,18 @@ const EmployerApplications = () => {
                         {applications.filter(a => a.status === 'reviewed').length}
                     </p>
                     <p className="text-sm text-gray-600">Reviewed</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                    <p className="text-2xl font-bold text-purple-600">
+                        {applications.filter(a => a.status === 'interview_scheduled').length}
+                    </p>
+                    <p className="text-sm text-gray-600">Interview</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-4">
+                    <p className="text-2xl font-bold text-indigo-600">
+                        {applications.filter(a => a.status === 'interview_confirmed').length}
+                    </p>
+                    <p className="text-sm text-gray-600">Confirmed</p>
                 </div>
                 <div className="bg-white rounded-lg shadow p-4">
                     <p className="text-2xl font-bold text-green-600">
@@ -157,7 +196,7 @@ const EmployerApplications = () => {
             {/* Filters */}
             <div className="bg-white rounded-lg shadow p-4 mb-6">
                 <div className="flex flex-wrap gap-2">
-                    {['all', 'pending', 'reviewed', 'accepted', 'rejected'].map(status => (
+                    {['all', 'pending', 'reviewed', 'interview_scheduled', 'interview_confirmed', 'accepted', 'rejected'].map(status => (
                         <button
                             key={status}
                             onClick={() => setFilter(status)}
@@ -167,9 +206,54 @@ const EmployerApplications = () => {
                                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             }`}
                         >
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                            {status === 'all' ? 'All' : status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                         </button>
                     ))}
+                </div>
+            </div>
+
+            {/* Bulk Email Section */}
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg shadow-md p-6 mb-6 border border-green-200">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                        <svg className="h-8 w-8 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800">Bulk Email Actions</h3>
+                            <p className="text-sm text-gray-600">
+                                {selectedApplications.length > 0 
+                                    ? `${selectedApplications.length} candidate(s) selected` 
+                                    : 'Select candidates to send emails'}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        {selectedApplications.length > 0 && (
+                            <button 
+                                onClick={clearSelection}
+                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-semibold"
+                            >
+                                Clear ({selectedApplications.length})
+                            </button>
+                        )}
+                        <button 
+                            onClick={selectAllVisible}
+                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm font-semibold"
+                        >
+                            Select All
+                        </button>
+                        <button 
+                            onClick={() => setIsEmailModalOpen(true)}
+                            disabled={selectedApplications.length === 0}
+                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                        >
+                            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            Send Email
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -180,14 +264,20 @@ const EmployerApplications = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                        No {filter !== 'all' ? filter : ''} applications
+                        No {filter !== 'all' ? filter.replace('_', ' ') : ''} applications
                     </h3>
                 </div>
             ) : (
                 <div className="space-y-4">
                     {filteredApplications.map(app => (
-                        <div key={app.id} className="bg-white rounded-lg shadow hover:shadow-lg transition p-6">
-                            <div className="flex items-start justify-between mb-4">
+                        <div key={app.id} className="mb-6 bg-white rounded-lg shadow-md p-4 border border-gray-100">
+                            <div className="flex items-start">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedApplications.includes(app.id)}
+                                    onChange={() => toggleSelect(app.id)}
+                                    className="mr-4 mt-2 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                />
                                 <div className="flex-1">
                                     <div className="flex items-center space-x-3 mb-2">
                                         <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
@@ -207,7 +297,7 @@ const EmployerApplications = () => {
                                             </span>
                                         )}
                                     </div>
-                                    
+
                                     <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                                         <span className="flex items-center">
                                             <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,12 +323,12 @@ const EmployerApplications = () => {
                                 </div>
 
                                 <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(app.status)}`}>
-                                    {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                                    {app.status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                                 </span>
                             </div>
 
                             {/* CV Actions */}
-                            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200 mt-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center space-x-2">
                                         <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +389,7 @@ const EmployerApplications = () => {
                             )}
 
                             {/* Action Buttons */}
-                            <div className="flex items-center space-x-2 pt-4 border-t border-gray-200">
+                            <div className="flex items-center flex-wrap gap-2 pt-4 border-t border-gray-200">
                                 {app.status === 'pending' && (
                                     <>
                                         <button
@@ -307,6 +397,15 @@ const EmployerApplications = () => {
                                             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
                                         >
                                             Mark as Reviewed
+                                        </button>
+                                        <button
+                                            onClick={() => openInterviewModal(app)}
+                                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold flex items-center"
+                                        >
+                                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            Schedule Interview
                                         </button>
                                         <button
                                             onClick={() => updateApplicationStatus(app.id, 'accepted')}
@@ -325,6 +424,38 @@ const EmployerApplications = () => {
 
                                 {app.status === 'reviewed' && (
                                     <>
+                                        <button
+                                            onClick={() => openInterviewModal(app)}
+                                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold flex items-center"
+                                        >
+                                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            Schedule Interview
+                                        </button>
+                                        <button
+                                            onClick={() => updateApplicationStatus(app.id, 'accepted')}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+                                        >
+                                            Accept
+                                        </button>
+                                        <button
+                                            onClick={() => updateApplicationStatus(app.id, 'rejected')}
+                                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
+                                        >
+                                            Reject
+                                        </button>
+                                    </>
+                                )}
+
+                                {(app.status === 'interview_scheduled' || app.status === 'interview_confirmed') && (
+                                    <>
+                                        <div className="px-4 py-2 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg font-semibold flex items-center">
+                                            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Interview {app.status === 'interview_confirmed' ? 'Confirmed' : 'Pending'}
+                                        </div>
                                         <button
                                             onClick={() => updateApplicationStatus(app.id, 'accepted')}
                                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
@@ -403,6 +534,33 @@ const EmployerApplications = () => {
                     </div>
                 </div>
             )}
+
+            {/* Email Template Modal */}
+            <EmailTemplateModal
+                isOpen={isEmailModalOpen}
+                onClose={() => setIsEmailModalOpen(false)}
+                selectedApplicationIds={selectedApplications}
+                onSent={(result) => {
+                    console.log('Email sent:', result);
+                    clearSelection();
+                    fetchJobAndApplications();
+                }}
+            />
+
+            {/* Interview Invitation Modal */}
+            <InterviewInvitationModal
+                isOpen={isInterviewModalOpen}
+                onClose={() => {
+                    setIsInterviewModalOpen(false);
+                    setSelectedApplicationForInterview(null);
+                }}
+                application={selectedApplicationForInterview}
+                jobTitle={job?.title}
+                onSent={(result) => {
+                    console.log('Interview invitation sent:', result);
+                    fetchJobAndApplications();
+                }}
+            />
         </div>
     );
 };

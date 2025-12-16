@@ -1,23 +1,75 @@
-// server/src/controllers/aiController.js
-
 const { embedJobDescription, embedCV } = require('../services/embeddingService');
 const { cosineSimilarity } = require('../utils/vectorMath');
 const tailoringService = require('../services/tailoringService');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const db = require('../config/database');
+
+// Helper to extract text from file buffer
+const extractTextFromFile = async (file) => {
+    const { buffer, mimetype } = file;
+    
+    try {
+        if (mimetype === 'text/plain') {
+            return buffer.toString('utf-8');
+        } 
+        else if (mimetype === 'application/pdf') {
+            const pdfData = await pdfParse(buffer);
+            return pdfData.text;
+        }
+        else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            const result = await mammoth.extractRawText({ buffer });
+            return result.value;
+        }
+        else {
+            throw new Error('Unsupported file type');
+        }
+    } catch (error) {
+        console.error('Error extracting text:', error);
+        throw new Error('Failed to extract text from file: ' + error.message);
+    }
+};
 
 // Match job with CV
 const getJobMatchingScore = async (req, res) => {
     try {
-        const { jobDescription, cvText } = req.body;
-
-        if (!jobDescription || !cvText) {
-            return res.status(400).json({ error: 'Job description and CV text are required' });
+        const { jobId } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'CV file is required' });
+        }
+        
+        if (!jobId) {
+            return res.status(400).json({ error: 'Job ID is required' });
         }
 
         console.log('=== Starting Match Score Calculation ===');
+        console.log('Job ID:', jobId);
+        console.log('File:', req.file.originalname, 'Type:', req.file.mimetype);
+
+        // Get job description from database
+        const jobResult = await db.query('SELECT description FROM jobs WHERE id = $1', [jobId]);
+        
+        if (jobResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+        
+        const jobDescription = jobResult.rows[0].description;
         console.log('Job description length:', jobDescription.length);
+
+        // Extract CV text from uploaded file
+        console.log('Extracting CV text...');
+        const cvText = await extractTextFromFile(req.file);
+        
+        if (!cvText || cvText.trim().length === 0) {
+            return res.status(400).json({ 
+                error: 'Could not extract text from CV file. Please ensure the file contains readable text.' 
+            });
+        }
+        
         console.log('CV text length:', cvText.length);
 
-        // Generate embeddings using text-embedding-004
+        // Generate embeddings
         console.log('Step 1: Generating job description embedding...');
         const jobVector = await embedJobDescription(jobDescription);
         
@@ -32,22 +84,16 @@ const getJobMatchingScore = async (req, res) => {
         console.log('=== Match Score Calculation Complete ===');
         
         res.json({ 
-            matchingScore: Math.round(score * 100) / 100,
-            message: 'Matching score calculated successfully',
-            dimensions: {
-                jobVector: jobVector.length,
-                cvVector: cvVector.length
-            }
+            score: Math.round(score * 100) / 100,
+            message: 'Match score calculated successfully'
         });
     } catch (error) {
-        console.error('❌ Error calculating matching score:', error);
+        console.error('❌ Error calculating match score:', error);
         
-        // Specific error handling
         if (error.message.includes('quota')) {
             return res.status(429).json({ 
                 error: 'API quota exceeded',
-                details: 'Please wait a moment before trying again',
-                retryAfter: 60
+                details: 'Please wait a moment before trying again'
             });
         }
         
@@ -59,72 +105,91 @@ const getJobMatchingScore = async (req, res) => {
         }
         
         res.status(500).json({ 
-            error: 'Error calculating matching score',
-            details: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            error: 'Error calculating match score',
+            details: error.message
         });
     }
 };
 
 // Tailor CV based on job description
-const getTailoredCV = async (req, res) => {
+const tailorCV = async (req, res) => {
     try {
-        const { cvText, jobDescription } = req.body;
-
-        if (!cvText || !jobDescription) {
-            return res.status(400).json({ error: 'CV text and job description are required' });
+        const { jobId } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'CV file is required' });
+        }
+        
+        if (!jobId) {
+            return res.status(400).json({ error: 'Job ID is required' });
         }
 
         console.log('=== Starting CV Tailoring ===');
-        console.log('CV Length:', cvText.length);
-        console.log('Job Description Length:', jobDescription.length);
-        console.log('Using model: gemini-2.5-flash');
+        console.log('Job ID:', jobId);
+        console.log('File:', req.file.originalname);
+        console.log('GEMINI_API_KEY exists:', !!process.env.GEMINI_API_KEY); // ← THÊM DÒNG NÀY
+
+        // Get job description from database
+        const jobResult = await db.query('SELECT description FROM jobs WHERE id = $1', [jobId]);
         
-        const tailoredResult = await tailoringService.tailorCV(cvText, jobDescription);
+        if (jobResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
         
-        console.log('✓ CV tailored successfully');
-        console.log('=== CV Tailoring Complete ===');
+        const jobDescription = jobResult.rows[0].description;
+        console.log('Job description length:', jobDescription.length);
+
+        // Extract CV text from uploaded file
+        console.log('Extracting CV text...');
+        const cvText = await extractTextFromFile(req.file);
         
-        res.json({ 
-            tailoredCV: tailoredResult,
-            message: 'CV analysis completed successfully',
-            model: 'gemini-2.5-flash'
+        if (!cvText || cvText.trim().length === 0) {
+            return res.status(400).json({ 
+                error: 'Could not extract text from CV file. Please ensure the file contains readable text.' 
+            });
+        }
+        
+        console.log('CV text length:', cvText.length);
+        
+        // Call tailoring service
+        console.log('Calling tailoring service...');
+        const suggestions = await tailoringService.tailorCV(cvText, jobDescription);
+        console.log('✓ Suggestions received:', suggestions);
+
+        res.json({
+            success: true,
+            suggestions: {
+                missingKeywords: suggestions.missingKeywords || [],
+                missingSkills: suggestions.missingSkills || [],
+                suggestions: suggestions.suggestions || [],
+                improvements: suggestions.improvements || []
+            }
         });
     } catch (error) {
-        console.error('❌ Error tailoring CV:', error);
+        console.error('❌ Tailor CV error:', error);
         
-        // Specific error handling
         if (error.message.includes('quota')) {
             return res.status(429).json({ 
                 error: 'API quota exceeded',
-                details: 'Please wait a moment before trying again',
-                retryAfter: 60
+                details: 'Please wait a moment before trying again'
             });
         }
         
-        if (error.message.includes('access denied') || error.message.includes('403')) {
-            return res.status(403).json({ 
-                error: 'API access denied',
-                details: 'Please verify your API key has the correct permissions'
-            });
-        }
-        
-        if (error.message.includes('not available') || error.message.includes('404')) {
+        if (error.message.includes('Model') || error.message.includes('model')) {
             return res.status(503).json({ 
-                error: 'AI service temporarily unavailable',
+                error: 'AI model unavailable',
                 details: 'The AI model is currently unavailable. Please try again later.'
             });
         }
         
         res.status(500).json({ 
             error: 'Error tailoring CV',
-            details: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            details: error.message
         });
     }
 };
 
 module.exports = {
     getJobMatchingScore,
-    getTailoredCV
+    tailorCV
 };

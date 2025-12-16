@@ -1,4 +1,5 @@
 import React from 'react';
+import ProfilePage from './pages/ProfilePage';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation';
@@ -14,6 +15,8 @@ import EmployerDashboard from './pages/EmployerDashboard';
 import EmployerApplications from './pages/EmployerApplications';
 import AllApplications from './pages/AllApplications';
 import MyApplications from './pages/MyApplications';
+import InterviewSchedulePage from './pages/InterviewSchedulePage';
+import MyInterviews from './pages/MyInterviews';
 
 const App = () => {
     return (
@@ -73,7 +76,35 @@ const App = () => {
                                     </ProtectedRoute>
                                 } 
                             />
+
+                            {/* Interview Routes */}
+                            <Route 
+                                path="/interview/schedule/:applicationId" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <InterviewSchedulePage />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            <Route 
+                                path="/my-interviews" 
+                                element={
+                                    <ProtectedRoute>
+                                        <MyInterviews />
+                                    </ProtectedRoute>
+                                } 
+                            />
                             
+                            {/* Profile Route */}
+                            <Route 
+                                path="/profile" 
+                                element={
+                                    <ProtectedRoute>
+                                        <ProfilePage />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
                             {/* 404 */}
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
