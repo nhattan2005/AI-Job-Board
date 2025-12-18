@@ -1,6 +1,12 @@
 const express = require('express');
 const multer = require('multer');
-const { generateCareerPath } = require('../controllers/careerController');
+const { 
+    generateCareerPath, 
+    saveRoadmap, 
+    getMyRoadmap, 
+    updateRoadmapProgress 
+} = require('../controllers/careerController');
+const { verifyToken } = require('../middleware/authMiddleware'); // Import middleware
 
 const router = express.Router();
 
@@ -25,5 +31,10 @@ const upload = multer({
 // Route to generate career path
 // Accepts both file upload and text in body
 router.post('/generate', upload.single('cv'), generateCareerPath);
+
+// --- ROUTES MỚI ---
+router.post('/save', verifyToken, saveRoadmap);
+router.get('/my-roadmap', verifyToken, getMyRoadmap);
+router.patch('/progress', verifyToken, updateRoadmapProgress);
 
 module.exports = router;

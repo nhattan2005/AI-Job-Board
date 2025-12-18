@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { Link } from 'react-router-dom';
+import axios from 'axios'; // Hoặc import api from '../services/api' nếu bạn đã cấu hình
+import api from '../services/api'; // Sử dụng instance api đã cấu hình token
+import { Link, useNavigate } from 'react-router-dom'; // Thêm useNavigate
 
 const CareerPath = () => {
     const [cvText, setCvText] = useState('');
@@ -9,6 +10,8 @@ const CareerPath = () => {
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
     const [useFileUpload, setUseFileUpload] = useState(false);
+    const navigate = useNavigate(); // Hook điều hướng
+    const [saving, setSaving] = useState(false); // State loading khi save
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -73,6 +76,25 @@ const CareerPath = () => {
         if (match >= 80) return 'text-green-600';
         if (match >= 60) return 'text-blue-600';
         return 'text-orange-600';
+    };
+
+    // --- HÀM MỚI: APPLY ROADMAP ---
+    const handleApplyRoadmap = async () => {
+        if (!result) return;
+        setSaving(true);
+        try {
+            await api.post('/career/save', {
+                target_role: result.current_positioning.role, // Hoặc lấy từ path được chọn
+                roadmap: result.roadmap
+            });
+            // Chuyển hướng sang trang My Roadmap
+            navigate('/my-roadmap');
+        } catch (error) {
+            console.error("Failed to save roadmap", error);
+            alert("Failed to save roadmap. Please try again.");
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -331,24 +353,46 @@ const CareerPath = () => {
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Action Buttons - CẬP NHẬT PHẦN NÀY */}
                     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg p-8 text-center text-white">
                         <h3 className="text-2xl font-bold mb-4">Ready to Start Your Journey?</h3>
                         <p className="mb-6 text-blue-100">
-                            Apply this roadmap and start building your dream career today!
+                            Apply this roadmap to your personal dashboard and track your daily progress!
                         </p>
                         <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
                             <Link
                                 to="/"
-                                className="inline-block bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-blue-50 transition shadow-lg"
+                                className="inline-block bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3 rounded-lg font-bold hover:bg-white/20 transition"
                             >
                                 Browse Jobs
                             </Link>
+                            
+                            {/* Nút Apply Roadmap Mới */}
+                            <button
+                                onClick={handleApplyRoadmap}
+                                disabled={saving}
+                                className="inline-flex items-center bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-blue-50 transition shadow-lg disabled:opacity-70"
+                            >
+                                {saving ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        🚀 Start This Journey
+                                    </>
+                                )}
+                            </button>
+
                             <button
                                 onClick={() => window.print()}
                                 className="inline-block bg-blue-700 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-800 transition shadow-lg"
                             >
-                                📄 Print Roadmap
+                                📄 Print
                             </button>
                         </div>
                     </div>

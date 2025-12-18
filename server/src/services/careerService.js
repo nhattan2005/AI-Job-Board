@@ -10,136 +10,103 @@ const generateCareerPath = async (cvText) => {
             model: "gemini-2.5-flash",
             generationConfig: {
                 temperature: 0.7,
-                maxOutputTokens: 2048,
+                maxOutputTokens: 8192,
+                responseMimeType: "application/json"
             }
         });
 
-        const prompt = `You are an expert career counselor and HR consultant with deep knowledge of IT industry trends, salary benchmarks, and career development paths.
+        if (!cvText) throw new Error("CV text is required");
 
-Analyze this CV and provide a comprehensive career path analysis.
+        const prompt = `
+        You are an expert AI Career Counselor. Analyze the following CV text and generate a personalized career development path.
+        
+        CV Text:
+        "${cvText}"
 
-CV:
-${cvText.substring(0, 3000)}
-
-IMPORTANT: Respond with ONLY a valid JSON object (no markdown, no code blocks, no extra text). Use this exact structure:
-
-{
-  "current_positioning": {
-    "role": "Current or most recent job title",
-    "level": "Junior/Mid-level/Senior/Lead",
-    "salary_potential": "$XX,XXX - $XXX,XXX USD/year",
-    "summary": "2-3 sentence summary of current career position"
-  },
-  "skill_gap": [
-    {
-      "skill": "Skill name",
-      "status": "Missing or Weak",
-      "priority": "High or Medium or Low"
-    }
-  ],
-  "paths": [
-    {
-      "name": "Career path name (e.g., 'Senior Full-Stack Developer')",
-      "match": 85,
-      "time": "1-2 years",
-      "pros": ["Pro 1", "Pro 2", "Pro 3"],
-      "cons": ["Con 1", "Con 2"]
-    }
-  ],
-  "roadmap": [
-    {
-      "phase": "0-3 Months",
-      "actions": [
+        Return the response in STRICT JSON format matching exactly the structure below.
+        
+        CRITICAL RULES:
+        1. Use DOUBLE QUOTES for all keys and string values.
+        2. NO trailing commas after the last item in arrays or objects.
+        3. NO comments inside the JSON.
+        
+        JSON Structure:
         {
-          "type": "Learn or Project or Certification",
-          "content": "Specific actionable task"
+          "current_positioning": {
+            "role": "Current or most suitable job title",
+            "level": "Junior/Mid/Senior",
+            "salary_potential": "Estimated salary range (e.g. $60k - $80k)",
+            "summary": "Brief professional summary"
+          },
+          "skill_gap": [
+            { 
+              "skill": "Name of the skill", 
+              "status": "Missing OR Weak", 
+              "priority": "High OR Medium OR Low" 
+            }
+          ],
+          "paths": [
+            { 
+              "name": "Potential Career Path / Job Role", 
+              "match": 85, 
+              "time": "e.g. 3-6 months", 
+              "pros": ["Advantage 1", "Advantage 2"], 
+              "cons": ["Challenge 1", "Challenge 2"] 
+            }
+          ],
+          "roadmap": [
+            { 
+              "phase": "Phase Name (e.g. Month 1-2: Foundations)", 
+              "actions": [
+                { "type": "Learn OR Project OR Network", "content": "Specific action item" }
+              ] 
+            }
+          ]
         }
-      ]
-    }
-  ]
-}
+        `;
 
-Guidelines:
-- Provide 3-5 skill gaps
-- Suggest 3-4 career paths with realistic match percentages (60-95%)
-- Create a 12-month roadmap with 4 phases (0-3, 3-6, 6-9, 9-12 months)
-- Each phase should have 3-5 specific, actionable tasks
-- Be realistic about timelines and difficulty
-- Consider current job market trends in IT
+        console.log("Sending request to Gemini API...");
 
-Respond with ONLY the JSON object, no other text.`;
-
-        console.log('Sending request to Gemini API...');
         const result = await model.generateContent(prompt);
         const response = await result.response;
         let text = response.text();
+        
+        console.log("Received response from Gemini");
 
-        console.log('Received response from Gemini');
+        // --- BƯỚC VỆ SINH JSON (JSON SANITIZATION) ---
+        
+        // 1. Xóa Markdown code blocks
+        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        // 2. Xóa comments (// ...) nếu có
+        text = text.replace(/\/\/.*$/gm, '');
 
-        // Clean up response - remove markdown if present
-        text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        // 3. Fix lỗi dấu phẩy thừa (Trailing Commas) - Nguyên nhân chính gây lỗi
+        // Tìm dấu phẩy đứng trước dấu đóng } hoặc ] và xóa nó đi
+        text = text.replace(/,(\s*[}\]])/g, '$1');
 
-        // Parse JSON
-        let careerPath;
         try {
-            careerPath = JSON.parse(text);
-            console.log('✓ JSON parsed successfully');
+            const analysis = JSON.parse(text);
+            return analysis;
         } catch (parseError) {
-            console.error('❌ JSON parse error:', parseError.message);
-            console.error('Raw response:', text.substring(0, 500));
-            throw new Error('Invalid JSON response from AI. Please try again.');
+            console.error("JSON Parse Error. Raw Text:", text);
+            throw new Error("AI response format was invalid.");
         }
 
-        // Validate structure
-        if (!careerPath.current_positioning || !careerPath.skill_gap || 
-            !careerPath.paths || !careerPath.roadmap) {
-            throw new Error('Incomplete career path data from AI');
-        }
-
-        return careerPath;
     } catch (error) {
         console.error('❌ Career path generation error:', error);
         
-        // Handle quota exceeded
-        if (error.status === 429) {
-            throw new Error('API quota exceeded. Please wait and try again.');
-        }
-        
-        // Return fallback structure if AI fails
+        // Fallback data để tránh crash Frontend
         return {
             current_positioning: {
-                role: "Unable to analyze",
+                role: "Analysis Failed",
                 level: "Unknown",
-                salary_potential: "Unable to estimate",
-                summary: "Could not analyze CV at this time. Please try again."
+                salary_potential: "Unknown",
+                summary: "Could not analyze CV due to AI service interruption. Please try again later."
             },
-            skill_gap: [
-                {
-                    skill: "Analysis unavailable",
-                    status: "Unknown",
-                    priority: "Unknown"
-                }
-            ],
-            paths: [
-                {
-                    name: "Unable to suggest paths",
-                    match: 0,
-                    time: "Unknown",
-                    pros: ["Please try again later"],
-                    cons: ["AI service temporarily unavailable"]
-                }
-            ],
-            roadmap: [
-                {
-                    phase: "Try Again",
-                    actions: [
-                        {
-                            type: "Info",
-                            content: "Career path analysis is temporarily unavailable. Please try again in a few moments."
-                        }
-                    ]
-                }
-            ]
+            skill_gap: [],
+            paths: [],
+            roadmap: []
         };
     }
 };

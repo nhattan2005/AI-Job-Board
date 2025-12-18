@@ -11,8 +11,13 @@ const EmployerApplications = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [filter, setFilter] = useState('all');
+    
+    // UI States
     const [viewingCV, setViewingCV] = useState(null);
+    const [expandedAppId, setExpandedAppId] = useState(null);
     const [selectedApplications, setSelectedApplications] = useState([]);
+    
+    // Modals
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
     const [selectedApplicationForInterview, setSelectedApplicationForInterview] = useState(null);
@@ -42,7 +47,10 @@ const EmployerApplications = () => {
             await axios.patch(`/api/applications/${applicationId}/status`, {
                 status: newStatus
             });
-            fetchJobAndApplications();
+            // Optimistic update
+            setApplications(apps => apps.map(app => 
+                app.id === applicationId ? { ...app, status: newStatus } : app
+            ));
         } catch (error) {
             console.error('Error updating status:', error);
             alert('Failed to update application status');
@@ -55,6 +63,10 @@ const EmployerApplications = () => {
     };
 
     const downloadCV = (app) => {
+        if (!app.cv_text) {
+            alert('No CV text available');
+            return;
+        }
         const blob = new Blob([app.cv_text], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -66,35 +78,35 @@ const EmployerApplications = () => {
         window.URL.revokeObjectURL(url);
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'pending':
-                return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-            case 'reviewed':
-                return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'accepted':
-                return 'bg-green-100 text-green-800 border-green-200';
-            case 'rejected':
-                return 'bg-red-100 text-red-800 border-red-200';
-            case 'interview_scheduled':
-                return 'bg-purple-100 text-purple-800 border-purple-200';
-            case 'interview_confirmed':
-                return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-            default:
-                return 'bg-gray-100 text-gray-800 border-gray-200';
-        }
+    const toggleExpand = (id) => {
+        setExpandedAppId(expandedAppId === id ? null : id);
     };
 
-    const getMatchScoreColor = (score) => {
-        if (score >= 80) return 'text-green-600 font-bold';
-        if (score >= 60) return 'text-yellow-600 font-semibold';
-        return 'text-red-600';
+    // --- HELPER FUNCTIONS FOR UI ---
+
+    const getStatusBadge = (status) => {
+        const styles = {
+            pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+            reviewed: 'bg-blue-100 text-blue-800 border-blue-200',
+            accepted: 'bg-green-100 text-green-800 border-green-200',
+            rejected: 'bg-red-100 text-red-800 border-red-200',
+            interview_scheduled: 'bg-purple-100 text-purple-800 border-purple-200',
+            interview_confirmed: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+        };
+        const label = status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        return (
+            <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wide ${styles[status] || 'bg-gray-100'}`}>
+                {label}
+            </span>
+        );
     };
 
+    // --- FILTER LOGIC ---
     const filteredApplications = applications.filter(app => 
         filter === 'all' ? true : app.status === filter
     );
 
+    // --- SELECTION LOGIC ---
     const toggleSelect = (appId) => {
         setSelectedApplications(prev => {
             if (prev.includes(appId)) return prev.filter(id => id !== appId);
@@ -102,452 +114,275 @@ const EmployerApplications = () => {
         });
     };
 
-    const selectAllVisible = () => {
-        const visibleIds = filteredApplications.map(a => a.id);
-        setSelectedApplications(visibleIds);
-    };
-
     const clearSelection = () => setSelectedApplications([]);
 
-    if (loading) {
-        return (
-            <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="text-center py-12">
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg inline-block">
-                    {error}
-                </div>
-            </div>
-        );
-    }
+    if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+    if (error) return <div className="text-center py-20 text-red-600">{error}</div>;
 
     return (
-        <div className="max-w-5xl mx-auto">
-            {/* Header */}
-            <div className="mb-6">
-                <Link
-                    to="/employer/dashboard"
-                    className="text-blue-600 hover:text-blue-800 font-semibold flex items-center mb-4"
-                >
-                    <svg className="h-5 w-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
+        <div className="max-w-6xl mx-auto pb-20">
+            {/* Header Section */}
+            <div className="mb-8">
+                <Link to="/employer/dashboard" className="text-slate-500 hover:text-blue-600 font-medium flex items-center mb-4 transition">
+                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
                     Back to Dashboard
                 </Link>
-
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                    Applications for: {job?.title}
-                </h1>
-                <p className="text-gray-600">
-                    {applications.length} total application{applications.length !== 1 ? 's' : ''}
-                </p>
-            </div>
-
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-7 gap-4 mb-6">
-                <div className="bg-white rounded-lg shadow p-4">
-                    <p className="text-2xl font-bold text-gray-800">{applications.length}</p>
-                    <p className="text-sm text-gray-600">Total</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                    <p className="text-2xl font-bold text-yellow-600">
-                        {applications.filter(a => a.status === 'pending').length}
-                    </p>
-                    <p className="text-sm text-gray-600">Pending</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                    <p className="text-2xl font-bold text-blue-600">
-                        {applications.filter(a => a.status === 'reviewed').length}
-                    </p>
-                    <p className="text-sm text-gray-600">Reviewed</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                    <p className="text-2xl font-bold text-purple-600">
-                        {applications.filter(a => a.status === 'interview_scheduled').length}
-                    </p>
-                    <p className="text-sm text-gray-600">Interview</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                    <p className="text-2xl font-bold text-indigo-600">
-                        {applications.filter(a => a.status === 'interview_confirmed').length}
-                    </p>
-                    <p className="text-sm text-gray-600">Confirmed</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                    <p className="text-2xl font-bold text-green-600">
-                        {applications.filter(a => a.status === 'accepted').length}
-                    </p>
-                    <p className="text-sm text-gray-600">Accepted</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                    <p className="text-2xl font-bold text-red-600">
-                        {applications.filter(a => a.status === 'rejected').length}
-                    </p>
-                    <p className="text-sm text-gray-600">Rejected</p>
+                <div className="flex justify-between items-end">
+                    <div>
+                        <h1 className="text-3xl font-bold text-slate-900 mb-2">{job?.title}</h1>
+                        <p className="text-slate-500">{applications.length} Total Applications</p>
+                    </div>
+                    <div className="flex gap-3">
+                        {/* Stats Cards Mini */}
+                        <div className="px-4 py-2 bg-white rounded-lg border border-slate-200 shadow-sm text-center">
+                            <span className="block text-xl font-bold text-slate-800">{applications.filter(a => a.status === 'pending').length}</span>
+                            <span className="text-xs text-slate-500 uppercase font-bold">Pending</span>
+                        </div>
+                        <div className="px-4 py-2 bg-white rounded-lg border border-slate-200 shadow-sm text-center">
+                            <span className="block text-xl font-bold text-purple-600">{applications.filter(a => a.status.includes('interview')).length}</span>
+                            <span className="text-xs text-slate-500 uppercase font-bold">Interview</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-lg shadow p-4 mb-6">
-                <div className="flex flex-wrap gap-2">
-                    {['all', 'pending', 'reviewed', 'interview_scheduled', 'interview_confirmed', 'accepted', 'rejected'].map(status => (
+            {/* Toolbar: Filter & Bulk Actions */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-20 z-10">
+                {/* Filters */}
+                <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar">
+                    {['all', 'pending', 'reviewed', 'interview_scheduled', 'accepted', 'rejected'].map(status => (
                         <button
                             key={status}
                             onClick={() => setFilter(status)}
-                            className={`px-4 py-2 rounded-lg font-semibold transition ${
+                            className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition ${
                                 filter === status
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-slate-800 text-white shadow-md'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}
                         >
-                            {status === 'all' ? 'All' : status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                            {status === 'all' ? 'All Candidates' : status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                         </button>
                     ))}
                 </div>
-            </div>
 
-            {/* Bulk Email Section */}
-            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg shadow-md p-6 mb-6 border border-green-200">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                        <svg className="h-8 w-8 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-800">Bulk Email Actions</h3>
-                            <p className="text-sm text-gray-600">
-                                {selectedApplications.length > 0 
-                                    ? `${selectedApplications.length} candidate(s) selected` 
-                                    : 'Select candidates to send emails'}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        {selectedApplications.length > 0 && (
-                            <button 
-                                onClick={clearSelection}
-                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm font-semibold"
-                            >
-                                Clear ({selectedApplications.length})
-                            </button>
-                        )}
-                        <button 
-                            onClick={selectAllVisible}
-                            className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition text-sm font-semibold"
-                        >
-                            Select All
-                        </button>
-                        <button 
-                            onClick={() => setIsEmailModalOpen(true)}
-                            disabled={selectedApplications.length === 0}
-                            className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                        >
-                            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                            </svg>
+                {/* Bulk Actions */}
+                {selectedApplications.length > 0 && (
+                    <div className="flex items-center gap-3 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 animate-fade-in">
+                        <span className="text-sm font-bold text-blue-800">{selectedApplications.length} selected</span>
+                        <button onClick={() => setIsEmailModalOpen(true)} className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 font-semibold shadow-sm">
                             Send Email
                         </button>
+                        <button onClick={clearSelection} className="text-slate-400 hover:text-slate-600">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Applications List */}
-            {filteredApplications.length === 0 ? (
-                <div className="bg-white rounded-lg shadow p-12 text-center">
-                    <svg className="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                        No {filter !== 'all' ? filter.replace('_', ' ') : ''} applications
-                    </h3>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {filteredApplications.map(app => (
-                        <div key={app.id} className="mb-6 bg-white rounded-lg shadow-md p-4 border border-gray-100">
-                            <div className="flex items-start">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedApplications.includes(app.id)}
-                                    onChange={() => toggleSelect(app.id)}
-                                    className="mr-4 mt-2 h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <div className="flex-1">
-                                    <div className="flex items-center space-x-3 mb-2">
-                                        <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
-                                            <span className="text-xl font-bold text-blue-600">
-                                                {(app.candidate_name || 'C').charAt(0).toUpperCase()}
+            <div className="space-y-4">
+                {filteredApplications.length === 0 ? (
+                    <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 border-dashed">
+                        <div className="text-slate-300 mb-4 text-6xl">📭</div>
+                        <h3 className="text-lg font-bold text-slate-600">No applications found</h3>
+                        <p className="text-slate-400">Try changing the filter status.</p>
+                    </div>
+                ) : (
+                    filteredApplications.map(app => {
+                        const isExpanded = expandedAppId === app.id;
+                        const isSelected = selectedApplications.includes(app.id);
+
+                        return (
+                            <div key={app.id} className={`bg-white rounded-xl border transition-all duration-200 ${isSelected ? 'border-blue-400 ring-1 ring-blue-100' : 'border-slate-200 hover:border-blue-300 hover:shadow-md'}`}>
+                                {/* Main Card Row */}
+                                <div className="p-5 flex flex-col md:flex-row gap-6 items-start md:items-center">
+                                    
+                                    {/* Checkbox */}
+                                    <div className="pt-1 md:pt-0">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isSelected}
+                                            onChange={() => toggleSelect(app.id)}
+                                            className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                    </div>
+
+                                    {/* Candidate Info */}
+                                    <div className="flex-grow min-w-0">
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <h3 className="text-lg font-bold text-slate-900 truncate">{app.candidate_name}</h3>
+                                            {getStatusBadge(app.status)}
+                                        </div>
+                                        <div className="flex items-center gap-4 text-sm text-slate-500">
+                                            <span className="flex items-center truncate">
+                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                                                {app.candidate_email}
+                                            </span>
+                                            <span className="hidden md:flex items-center">
+                                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                {new Date(app.applied_at).toLocaleDateString()}
                                             </span>
                                         </div>
-                                        <div>
-                                            <h3 className="text-xl font-bold text-gray-800">
-                                                {app.candidate_name || 'Candidate'}
-                                            </h3>
-                                            <p className="text-gray-600">{app.candidate_email}</p>
-                                        </div>
-                                        {app.match_score && (
-                                            <span className={`ml-auto text-2xl ${getMatchScoreColor(app.match_score)}`}>
-                                                {app.match_score}%
-                                            </span>
+                                    </div>
+
+                                    {/* Primary Actions - Context Aware */}
+                                    <div className="flex items-center gap-2 min-w-[200px] justify-end">
+                                        
+                                        {/* LOGIC MỚI: Pending -> Accept / Reject */}
+                                        {app.status === 'pending' && (
+                                            <>
+                                                <button 
+                                                    onClick={() => updateApplicationStatus(app.id, 'reviewed')}
+                                                    className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 shadow-sm transition"
+                                                >
+                                                    Accept
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        if(window.confirm('Are you sure you want to reject this candidate?')) {
+                                                            updateApplicationStatus(app.id, 'rejected');
+                                                        }
+                                                    }}
+                                                    className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 text-sm font-bold rounded-lg hover:bg-red-100 transition"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </>
                                         )}
-                                    </div>
-
-                                    <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-                                        <span className="flex items-center">
-                                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            Applied: {new Date(app.applied_at).toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'short',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
-                                        </span>
-                                        {app.candidate_skills && app.candidate_skills.length > 0 && (
-                                            <span className="flex items-center">
-                                                <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                                                </svg>
-                                                Skills: {app.candidate_skills.slice(0, 3).join(', ')}
-                                            </span>
+                                        
+                                        {/* LOGIC MỚI: Reviewed (Đã Accept) -> Interview */}
+                                        {app.status === 'reviewed' && (
+                                            <button 
+                                                onClick={() => openInterviewModal(app)}
+                                                className="px-4 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 shadow-sm transition flex items-center"
+                                            >
+                                                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                Interview
+                                            </button>
                                         )}
+
+                                        {(app.status.includes('interview')) && (
+                                            <button 
+                                                onClick={() => updateApplicationStatus(app.id, 'accepted')}
+                                                className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 shadow-sm transition"
+                                            >
+                                                Hire
+                                            </button>
+                                        )}
+
+                                        {/* Expand Toggle */}
+                                        <button 
+                                            onClick={() => toggleExpand(app.id)}
+                                            className={`p-2 rounded-lg transition ${isExpanded ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:bg-slate-50'}`}
+                                        >
+                                            <svg className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                                        </button>
                                     </div>
                                 </div>
 
-                                <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(app.status)}`}>
-                                    {app.status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                                </span>
-                            </div>
+                                {/* Expanded Details Section */}
+                                {isExpanded && (
+                                    <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-fade-in rounded-b-xl">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {/* Left: AI Insights & Skills */}
+                                            <div className="space-y-6">
+                                                {/* AI Advice */}
+                                                {app.ai_advice && app.ai_advice.length > 0 && (
+                                                    <div className="bg-white p-4 rounded-xl border border-purple-100 shadow-sm">
+                                                        <h4 className="font-bold text-purple-900 mb-3 flex items-center">
+                                                            <span className="mr-2">✨</span> AI Insights
+                                                        </h4>
+                                                        <ul className="space-y-2">
+                                                            {app.ai_advice.slice(0, 3).map((advice, idx) => (
+                                                                <li key={idx} className="text-sm text-slate-700 flex items-start">
+                                                                    <span className="text-purple-400 mr-2">•</span>
+                                                                    {advice}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
 
-                            {/* CV Actions */}
-                            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200 mt-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-2">
-                                        <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <span className="font-semibold text-gray-700">CV Document</span>
-                                        <span className="text-sm text-gray-500">
-                                            ({app.cv_filename || 'cv.txt'})
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => setViewingCV(app)}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold flex items-center"
-                                        >
-                                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                            View CV
-                                        </button>
-                                        <button
-                                            onClick={() => downloadCV(app)}
-                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-semibold flex items-center"
-                                        >
-                                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                            </svg>
-                                            Download
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                                                {/* Skills */}
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Detected Skills</h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {app.candidate_skills && app.candidate_skills.length > 0 ? (
+                                                            app.candidate_skills.map((skill, i) => (
+                                                                <span key={i} className="px-2.5 py-1 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-600">
+                                                                    {skill}
+                                                                </span>
+                                                            ))
+                                                        ) : <span className="text-sm text-slate-400 italic">No skills detected</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
 
-                            {/* AI Advice */}
-                            {app.ai_advice && app.ai_advice.length > 0 && (
-                                <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                                    <h4 className="font-semibold text-purple-800 mb-2 flex items-center">
-                                        <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                                        </svg>
-                                        AI Insights
-                                    </h4>
-                                    <ul className="list-disc list-inside text-sm text-purple-700 space-y-1">
-                                        {app.ai_advice.slice(0, 3).map((advice, idx) => (
-                                            <li key={idx}>{advice}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
+                                            {/* Right: Cover Letter & Secondary Actions */}
+                                            <div className="space-y-6">
+                                                {/* Cover Letter */}
+                                                {app.cover_letter && (
+                                                    <div>
+                                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cover Letter</h4>
+                                                        <div className="bg-white p-4 rounded-xl border border-slate-200 text-sm text-slate-600 leading-relaxed max-h-40 overflow-y-auto">
+                                                            {app.cover_letter}
+                                                        </div>
+                                                    </div>
+                                                )}
 
-                            {/* Cover Letter */}
-                            {app.cover_letter && (
-                                <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                    <h4 className="font-semibold text-blue-800 mb-2">Cover Letter:</h4>
-                                    <p className="text-sm text-blue-700 whitespace-pre-wrap">{app.cover_letter}</p>
-                                </div>
-                            )}
-
-                            {/* Action Buttons */}
-                            <div className="flex items-center flex-wrap gap-2 pt-4 border-t border-gray-200">
-                                {app.status === 'pending' && (
-                                    <>
-                                        <button
-                                            onClick={() => updateApplicationStatus(app.id, 'reviewed')}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
-                                        >
-                                            Mark as Reviewed
-                                        </button>
-                                        <button
-                                            onClick={() => openInterviewModal(app)}
-                                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold flex items-center"
-                                        >
-                                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            Schedule Interview
-                                        </button>
-                                        <button
-                                            onClick={() => updateApplicationStatus(app.id, 'accepted')}
-                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-                                        >
-                                            Accept
-                                        </button>
-                                        <button
-                                            onClick={() => updateApplicationStatus(app.id, 'rejected')}
-                                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
-                                        >
-                                            Reject
-                                        </button>
-                                    </>
-                                )}
-
-                                {app.status === 'reviewed' && (
-                                    <>
-                                        <button
-                                            onClick={() => openInterviewModal(app)}
-                                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold flex items-center"
-                                        >
-                                            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            Schedule Interview
-                                        </button>
-                                        <button
-                                            onClick={() => updateApplicationStatus(app.id, 'accepted')}
-                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-                                        >
-                                            Accept
-                                        </button>
-                                        <button
-                                            onClick={() => updateApplicationStatus(app.id, 'rejected')}
-                                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
-                                        >
-                                            Reject
-                                        </button>
-                                    </>
-                                )}
-
-                                {(app.status === 'interview_scheduled' || app.status === 'interview_confirmed') && (
-                                    <>
-                                        <div className="px-4 py-2 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg font-semibold flex items-center">
-                                            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            Interview {app.status === 'interview_confirmed' ? 'Confirmed' : 'Pending'}
+                                                {/* Secondary Actions Grid */}
+                                                <div className="grid grid-cols-2 gap-3 pt-2">
+                                                    <button onClick={() => setViewingCV(app)} className="flex items-center justify-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                        View CV
+                                                    </button>
+                                                    <button onClick={() => downloadCV(app)} className="flex items-center justify-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                        Download
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <button
-                                            onClick={() => updateApplicationStatus(app.id, 'accepted')}
-                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-                                        >
-                                            Accept
-                                        </button>
-                                        <button
-                                            onClick={() => updateApplicationStatus(app.id, 'rejected')}
-                                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold"
-                                        >
-                                            Reject
-                                        </button>
-                                    </>
+                                    </div>
                                 )}
-
-                                {(app.status === 'accepted' || app.status === 'rejected') && (
-                                    <button
-                                        onClick={() => updateApplicationStatus(app.id, 'reviewed')}
-                                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition font-semibold"
-                                    >
-                                        Move to Reviewed
-                                    </button>
-                                )}
-
-                                <a
-                                    href={`mailto:${app.candidate_email}`}
-                                    className="ml-auto px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
-                                >
-                                    Contact Candidate
-                                </a>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        );
+                    })
+                )}
+            </div>
 
-            {/* CV Viewing Modal */}
+            {/* Modals */}
             {viewingCV && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                        <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-800">
-                                    {viewingCV.candidate_name}'s CV
-                                </h2>
-                                <p className="text-gray-600">{viewingCV.candidate_email}</p>
+                                <h2 className="text-xl font-bold text-slate-900">{viewingCV.candidate_name}'s CV</h2>
+                                <p className="text-sm text-slate-500">Preview Mode</p>
                             </div>
-                            <button
-                                onClick={() => setViewingCV(null)}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                            <button onClick={() => setViewingCV(null)} className="p-2 hover:bg-slate-100 rounded-full transition">
+                                <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <div className="p-6 overflow-y-auto flex-1">
-                            <pre className="whitespace-pre-wrap text-sm text-gray-700 font-mono bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <div className="flex-1 p-6 overflow-y-auto bg-slate-50">
+                            <div className="bg-white p-8 shadow-sm min-h-full whitespace-pre-wrap font-mono text-sm text-slate-700 rounded-lg border border-slate-200">
                                 {viewingCV.cv_text}
-                            </pre>
-                        </div>
-                        <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
-                            <button
-                                onClick={() => downloadCV(viewingCV)}
-                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-                            >
-                                Download CV
-                            </button>
-                            <button
-                                onClick={() => setViewingCV(null)}
-                                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
-                            >
-                                Close
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Email Template Modal */}
             <EmailTemplateModal
                 isOpen={isEmailModalOpen}
                 onClose={() => setIsEmailModalOpen(false)}
                 selectedApplicationIds={selectedApplications}
                 onSent={(result) => {
-                    console.log('Email sent:', result);
                     clearSelection();
                     fetchJobAndApplications();
                 }}
             />
 
-            {/* Interview Invitation Modal */}
             <InterviewInvitationModal
                 isOpen={isInterviewModalOpen}
                 onClose={() => {
@@ -557,7 +392,6 @@ const EmployerApplications = () => {
                 application={selectedApplicationForInterview}
                 jobTitle={job?.title}
                 onSent={(result) => {
-                    console.log('Interview invitation sent:', result);
                     fetchJobAndApplications();
                 }}
             />

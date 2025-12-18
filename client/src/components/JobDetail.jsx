@@ -3,6 +3,60 @@ import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
+// Helper Component for Accordion Suggestions
+const SuggestionAccordion = ({ suggestion, index }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    // Hàm xử lý format text: Tìm 'text' hoặc *text* và chuyển thành <strong>text</strong>
+    const formatContent = (text) => {
+        if (!text) return "";
+        
+        // Regex để split chuỗi, giữ lại các phần nằm trong '...' hoặc *...*
+        // Pattern: ('[^']+') HOẶC (\*[^*]+\*)
+        const parts = text.split(/('[^']+'|\*[^*]+\*)/g);
+        
+        return parts.map((part, i) => {
+            // Xử lý 'text' -> in đậm, bỏ dấu nháy
+            if (part.startsWith("'") && part.endsWith("'")) {
+                return <strong key={i} className="font-bold text-slate-900">{part.slice(1, -1)}</strong>;
+            }
+            // Xử lý *text* -> in đậm, bỏ dấu sao
+            if (part.startsWith("*") && part.endsWith("*")) {
+                return <strong key={i} className="font-bold text-slate-900">{part.slice(1, -1)}</strong>;
+            }
+            // Text thường
+            return part;
+        });
+    };
+
+    return (
+        <div className={`border border-slate-200 rounded-xl mb-3 overflow-hidden transition-all hover:shadow-md bg-white ${isOpen ? 'ring-1 ring-blue-200' : ''}`}>
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full px-5 py-4 text-left flex items-start gap-4 bg-white hover:bg-slate-50 transition-colors group"
+            >
+                {/* Số thứ tự */}
+                <span className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm mt-0.5">
+                    {index + 1}
+                </span>
+
+                {/* Nội dung chính - Tự động mở rộng khi isOpen = true */}
+                <div className={`flex-grow text-slate-700 text-sm leading-relaxed ${!isOpen ? 'line-clamp-1 text-slate-500' : ''}`}>
+                    {formatContent(suggestion)}
+                </div>
+
+                {/* Mũi tên chỉ xuống */}
+                <svg 
+                    className={`w-5 h-5 text-slate-400 flex-shrink-0 transition-transform duration-200 mt-1 ${isOpen ? 'rotate-180' : ''}`} 
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+        </div>
+    );
+};
+
 const JobDetail = () => {
     const { id } = useParams();
     const { isAuthenticated, isCandidate } = useAuth();
@@ -19,16 +73,12 @@ const JobDetail = () => {
     // AI features state
     const [matchScore, setMatchScore] = useState(null);
     const [aiSuggestions, setAiSuggestions] = useState(null);
-    const [loadingScore, setLoadingScore] = useState(false);
-    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [analyzing, setAnalyzing] = useState(false); // Unified loading state
 
     useEffect(() => {
         const fetchJobData = async () => {
             try {
-                // 1. Lấy thông tin Job (QUAN TRỌNG NHẤT)
                 const jobRes = await api.get(`/jobs/${id}`);
-                
-                // Xử lý nếu backend trả về mảng thay vì object
                 let jobData = jobRes.data;
                 if (Array.isArray(jobData)) {
                     jobData = jobData[0];
@@ -37,7 +87,6 @@ const JobDetail = () => {
                 if (!jobData) throw new Error("Job data is empty");
                 setJob(jobData);
 
-                // 2. Kiểm tra trạng thái ứng tuyển (Tách riêng ra để không gây lỗi trang)
                 if (isAuthenticated && isCandidate) {
                     checkApplicationStatus(id);
                 }
@@ -50,13 +99,11 @@ const JobDetail = () => {
             }
         };
 
-        // Hàm kiểm tra ứng tuyển riêng biệt, có try/catch riêng
         const checkApplicationStatus = async (jobId) => {
             try {
                 const checkRes = await api.get(`/applications/check/${jobId}`);
                 setHasApplied(checkRes.data.hasApplied);
             } catch (err) {
-                // Nếu lỗi 404 nghĩa là chưa apply hoặc API chưa có, ta chỉ log warning chứ không chặn UI
                 console.warn("Application check failed (ignoring):", err.message);
             }
         };
@@ -72,56 +119,38 @@ const JobDetail = () => {
         setAiSuggestions(null);
     };
 
-    const handleCalculateScore = async () => {
+    // Unified Analysis Function
+    const handleAnalyzeCV = async () => {
         if (!cvFile) return;
-        setLoadingScore(true);
+        setAnalyzing(true);
         
         const formData = new FormData();
         formData.append('cv', cvFile);
         formData.append('jobId', id);
 
         try {
-            const res = await api.post('/ai/match', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            // Run both requests in parallel for better UX
+            const [matchRes, suggestRes] = await Promise.all([
+                api.post('/ai/match', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+                api.post('/ai/tailor-cv', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+            ]);
 
-            console.log("AI Response:", res.data); // Xem log để biết chính xác backend trả về gì
-
-            // FIX: Kiểm tra cả 2 trường hợp tên biến phổ biến và làm tròn số
-            // Backend có thể trả về 'matchScore' hoặc 'score'
-            const rawScore = res.data.matchScore !== undefined ? res.data.matchScore : res.data.score;
-            
+            // Handle Match Score
+            const rawScore = matchRes.data.matchScore !== undefined ? matchRes.data.matchScore : matchRes.data.score;
             if (rawScore !== undefined) {
-                // Làm tròn thành số nguyên (ví dụ: 42.45 -> 42)
                 setMatchScore(Math.round(Number(rawScore)));
-            } else {
-                alert("Could not retrieve score from response");
+            }
+
+            // Handle Suggestions
+            if (suggestRes.data.suggestions) {
+                setAiSuggestions(suggestRes.data.suggestions);
             }
 
         } catch (err) {
-            console.error("AI Match Error:", err);
-            alert('Failed to calculate match score');
+            console.error("Analysis Error:", err);
+            alert('Failed to analyze CV. Please try again.');
         } finally {
-            setLoadingScore(false);
-        }
-    };
-
-    const handleGetSuggestions = async () => {
-        if (!cvFile) return;
-        setLoadingSuggestions(true);
-        const formData = new FormData();
-        formData.append('cv', cvFile);
-        formData.append('jobId', id);
-
-        try {
-            const res = await api.post('/ai/tailor-cv', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            setAiSuggestions(res.data.analysis);
-        } catch (err) {
-            alert('Failed to get AI suggestions');
-        } finally {
-            setLoadingSuggestions(false);
+            setAnalyzing(false);
         }
     };
 
@@ -133,7 +162,10 @@ const JobDetail = () => {
         setLoadingApply(true);
         const formData = new FormData();
         formData.append('cv', cvFile);
-        formData.append('jobId', id);
+        
+        // FIX: Đổi 'jobId' thành 'job_id' để khớp với Backend
+        formData.append('job_id', id); 
+        
         formData.append('coverLetter', coverLetter);
         if (matchScore) formData.append('matchScore', matchScore);
         if (aiSuggestions) formData.append('aiAdvice', JSON.stringify(aiSuggestions));
@@ -151,6 +183,31 @@ const JobDetail = () => {
         }
     };
 
+    // Helper for progress bar color
+    const getScoreColor = (score) => {
+        if (score >= 80) return 'bg-green-500';
+        if (score >= 60) return 'bg-yellow-500';
+        return 'bg-red-500';
+    };
+
+    const getScoreTextColor = (score) => {
+        if (score >= 80) return 'text-green-600';
+        if (score >= 60) return 'text-yellow-600';
+        return 'text-red-600';
+    };
+
+    // Thêm hàm này vào bên trong component JobDetail (trước return)
+    const formatSalary = (min, max) => {
+        if (!min && !max) return "Negotiable";
+        if (min === 0 && max === 0) return "Negotiable";
+        
+        const format = (n) => n?.toLocaleString('en-US');
+        
+        if (min && !max) return `From $${format(min)}`;
+        if (!min && max) return `Up to $${format(max)}`;
+        return `$${format(min)} - $${format(max)}`;
+    };
+
     if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     if (error) return <div className="text-center py-20 text-red-600 font-bold">{error}</div>;
     if (!job) return <div className="text-center py-20">Job not found</div>;
@@ -162,7 +219,7 @@ const JobDetail = () => {
                 Back to Jobs
             </Link>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 {/* LEFT COLUMN */}
                 <div className="lg:col-span-2 space-y-8">
                     <div className="bg-white rounded-2xl p-8 shadow-soft border border-slate-100">
@@ -187,8 +244,10 @@ const JobDetail = () => {
                             <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-sm font-medium flex items-center">
                                 💼 {job.employment_type}
                             </span>
+                            
+                            {/* FIX: Sử dụng hàm formatSalary thay vì hiển thị trực tiếp */}
                             <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-sm font-medium flex items-center">
-                                💰 ${job.salary_min?.toLocaleString()} - ${job.salary_max?.toLocaleString()}
+                                💰 {formatSalary(job.salary_min, job.salary_max)}
                             </span>
                         </div>
 
@@ -200,61 +259,141 @@ const JobDetail = () => {
                         </div>
                     </div>
 
-                    {/* AI Section */}
+                    {/* AI Section - REDESIGNED */}
                     {isAuthenticated && isCandidate && (
-                        <div className="bg-white rounded-2xl p-8 shadow-soft border border-slate-100 overflow-hidden relative">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 to-secondary-500"></div>
-                            <h2 className="text-xl font-bold text-slate-900 mb-6">✨ AI Application Assistant</h2>
-
-                            <div className="mb-8">
-                                <label className="block text-sm font-semibold text-slate-700 mb-3">1. Upload Your CV (PDF)</label>
-                                <input type="file" accept=".pdf" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer border border-slate-200 rounded-xl p-1" />
+                        <div className="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden relative">
+                            {/* Header Gradient */}
+                            <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6 text-white relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500 rounded-full blur-[80px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+                                <h2 className="text-xl font-bold flex items-center relative z-10">
+                                    <span className="mr-2 text-2xl">✨</span> AI Application Assistant
+                                </h2>
+                                <p className="text-slate-300 text-sm mt-1 relative z-10">Optimize your CV to increase interview chances.</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                                <button onClick={handleCalculateScore} disabled={!cvFile || loadingScore} className="p-4 rounded-xl border border-slate-200 hover:border-primary-500 hover:bg-primary-50 transition-all text-left group disabled:opacity-50">
-                                    <div className="font-bold text-slate-800 group-hover:text-primary-700">🎯 Match Score</div>
+                            <div className="p-8">
+                                <div className="mb-6">
+                                    <label className="block text-sm font-bold text-slate-700 mb-3">1. Upload Your CV (PDF)</label>
+                                    <input type="file" accept=".pdf" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer border border-slate-200 rounded-xl p-1" />
+                                </div>
+
+                                {/* Unified Action Button */}
+                                <button 
+                                    onClick={handleAnalyzeCV} 
+                                    disabled={!cvFile || analyzing} 
+                                    className="w-full mb-8 py-4 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white rounded-xl font-bold shadow-lg shadow-primary-500/30 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+                                >
+                                    {analyzing ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                            Analyzing CV...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                                            Analyze CV & Match
+                                        </>
+                                    )}
                                 </button>
-                                <button onClick={handleGetSuggestions} disabled={!cvFile || loadingSuggestions} className="p-4 rounded-xl border border-slate-200 hover:border-secondary-500 hover:bg-secondary-50 transition-all text-left group disabled:opacity-50">
-                                    <div className="font-bold text-slate-800 group-hover:text-secondary-700">💡 AI Suggestions</div>
-                                </button>
+
+                                {/* Results Section */}
+                                {(matchScore !== null || aiSuggestions) && (
+                                    <div className="space-y-8 animate-fade-in">
+                                        
+                                        {/* 1. Match Score Progress Bar */}
+                                        {matchScore !== null && (
+                                            <div className="bg-slate-50 rounded-xl p-6 border border-slate-200">
+                                                <div className="flex justify-between items-end mb-2">
+                                                    <span className="font-bold text-slate-700 text-lg">Match Score</span>
+                                                    <span className={`text-3xl font-extrabold ${getScoreTextColor(matchScore)}`}>
+                                                        {matchScore}%
+                                                    </span>
+                                                </div>
+                                                <div className="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
+                                                    <div 
+                                                        className={`h-full rounded-full transition-all duration-1000 ease-out ${getScoreColor(matchScore)}`}
+                                                        style={{ width: `${matchScore}%` }}
+                                                    ></div>
+                                                </div>
+                                                <p className="text-right text-xs text-slate-500 mt-2">Based on keyword and semantic analysis</p>
+                                            </div>
+                                        )}
+
+                                        {/* 2. Skill Gap Analysis (White Card, Amber Badges) */}
+                                        {aiSuggestions && (
+                                            <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                                                <h3 className="font-bold text-slate-800 mb-4 flex items-center text-lg">
+                                                    <svg className="w-6 h-6 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                    Skill Gap Analysis
+                                                </h3>
+                                                
+                                                <div className="space-y-4">
+                                                    {/* Hard Skills */}
+                                                    {aiSuggestions.missingSkills?.length > 0 && (
+                                                        <div>
+                                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Hard Skills</p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {aiSuggestions.missingSkills.map((k, i) => (
+                                                                    <span key={i} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-sm font-semibold rounded-lg border border-amber-100">
+                                                                        {k}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Soft Skills / Keywords */}
+                                                    {aiSuggestions.missingKeywords?.length > 0 && (
+                                                        <div>
+                                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Keywords</p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {aiSuggestions.missingKeywords.map((k, i) => (
+                                                                    <span key={i} className="px-3 py-1.5 bg-slate-100 text-slate-600 text-sm font-medium rounded-lg border border-slate-200">
+                                                                        {k}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 3. Smart Suggestions (Accordion) */}
+                                        {aiSuggestions?.suggestions?.length > 0 && (
+                                            <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-100">
+                                                <h3 className="font-bold text-blue-900 mb-4 flex items-center text-lg">
+                                                    <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                                    Smart Suggestions
+                                                </h3>
+                                                <div>
+                                                    {aiSuggestions.suggestions.map((s, i) => (
+                                                        <SuggestionAccordion key={i} suggestion={s} index={i} />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-
-                            {matchScore !== null && (
-                                <div className="mb-6 p-6 bg-slate-50 rounded-xl border border-slate-200">
-                                    <p className="text-sm font-medium text-slate-500">Match Score</p>
-                                    <p className={`text-3xl font-bold ${matchScore >= 70 ? 'text-green-600' : 'text-orange-500'}`}>{matchScore}%</p>
-                                </div>
-                            )}
-
-                            {aiSuggestions && (
-                                <div className="bg-primary-50/50 rounded-xl p-6 border border-primary-100 space-y-4">
-                                    <h3 className="font-bold text-primary-900">AI Analysis</h3>
-                                    <ul className="space-y-2">
-                                        {aiSuggestions.suggestions?.map((s, i) => (
-                                            <li key={i} className="flex items-start text-sm text-slate-700"><span className="mr-2 text-primary-500">•</span> {s}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>
 
-                {/* RIGHT COLUMN */}
-                <div className="space-y-6">
-                    <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100 sticky top-24">
+                {/* RIGHT COLUMN - Sticky Sidebar */}
+                <div className="space-y-6 sticky top-24">
+                    <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
                         <h3 className="text-lg font-bold text-slate-900 mb-4">Interested?</h3>
                         {isAuthenticated ? (
                             isCandidate ? (
                                 <>
-                                    <textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} rows="4" className="w-full px-4 py-3 rounded-xl border border-slate-200 mb-4 text-sm" placeholder="Cover Letter (Optional)" />
-                                    <button onClick={handleApply} disabled={loadingApply || hasApplied || !cvFile} className="w-full btn-primary disabled:opacity-50">
+                                    <textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} rows="4" className="w-full px-4 py-3 rounded-xl border border-slate-200 mb-4 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition" placeholder="Cover Letter (Optional)" />
+                                    <button onClick={handleApply} disabled={loadingApply || hasApplied || !cvFile} className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
                                         {loadingApply ? 'Sending...' : hasApplied ? 'Applied' : 'Apply Now'}
                                     </button>
-                                    {!cvFile && !hasApplied && <p className="text-xs text-red-500 mt-2 text-center">Upload CV first</p>}
+                                    {!cvFile && !hasApplied && <p className="text-xs text-red-500 mt-2 text-center font-medium">Please upload CV to apply</p>}
                                 </>
-                            ) : <div className="p-4 bg-slate-50 rounded-xl text-center text-sm">Employers cannot apply.</div>
+                            ) : <div className="p-4 bg-slate-50 rounded-xl text-center text-sm text-slate-500">Employers cannot apply.</div>
                         ) : (
                             <Link to="/login" className="block w-full text-center btn-primary">Login to Apply</Link>
                         )}

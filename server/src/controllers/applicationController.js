@@ -220,10 +220,29 @@ const updateApplicationStatus = async (req, res) => {
     }
 };
 
+// Check if user has applied for a job
+const checkApplicationStatus = async (req, res) => {
+    const { jobId } = req.params;
+    const candidate_id = req.user.id;
+
+    try {
+        const result = await db.query(
+            'SELECT id FROM applications WHERE job_id = $1 AND candidate_id = $2',
+            [jobId, candidate_id]
+        );
+
+        res.json({ hasApplied: result.rows.length > 0 });
+    } catch (error) {
+        console.error('Error checking application status:', error);
+        res.status(500).json({ error: 'Failed to check application status' });
+    }
+};
+
 module.exports = {
     upload,
     applyForJob,
     getMyApplications,
     analyzeApplication,
-    updateApplicationStatus
+    updateApplicationStatus,
+    checkApplicationStatus
 };

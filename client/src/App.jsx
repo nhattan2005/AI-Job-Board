@@ -18,6 +18,7 @@ import InterviewSchedulePage from './pages/InterviewSchedulePage';
 import MyInterviews from './pages/MyInterviews';
 import CareerPath from './pages/CareerPath'; // <-- Đảm bảo dòng này tồn tại
 import ProfilePage from './pages/ProfilePage'; // <-- Đảm bảo dòng này tồn tại
+import MyCareerRoadmap from './pages/MyCareerRoadmap'; // Import trang mới
 
 const App = () => {
     return (
@@ -51,6 +52,14 @@ const App = () => {
                                 element={
                                     <ProtectedRoute>
                                         <MyInterviews />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            <Route 
+                                path="/my-roadmap" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <MyCareerRoadmap />
                                     </ProtectedRoute>
                                 } 
                             />

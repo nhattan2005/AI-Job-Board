@@ -52,6 +52,16 @@ CREATE TABLE users (
     )
 );
 
+-- THÊM ĐOẠN NÀY: Bảng lưu lộ trình sự nghiệp
+CREATE TABLE IF NOT EXISTS user_roadmaps (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    target_role VARCHAR(255),
+    roadmap_data JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create jobs table (linked to employer)
 CREATE TABLE jobs (
     id SERIAL PRIMARY KEY,

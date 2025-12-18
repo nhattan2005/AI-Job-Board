@@ -9,6 +9,23 @@ const JobList = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterLocation, setFilterLocation] = useState('');
 
+    // THÊM HÀM NÀY: Xử lý hiển thị lương
+    const formatSalary = (min, max) => {
+        // Nếu cả 2 đều null hoặc 0 -> Thỏa thuận
+        if ((!min && !max) || (min === 0 && max === 0)) return "Negotiable";
+        
+        const format = (n) => n?.toLocaleString('en-US');
+        
+        // Nếu chỉ có min -> From ...
+        if (min && (!max || max === 0)) return `From $${format(min)}`;
+        
+        // Nếu chỉ có max -> Up to ...
+        if ((!min || min === 0) && max) return `Up to $${format(max)}`;
+        
+        // Có cả 2 -> Range
+        return `$${format(min)} - $${format(max)}`;
+    };
+
     useEffect(() => {
         const fetchJobs = async () => {
             try {
@@ -144,7 +161,8 @@ const JobList = () => {
                                 <svg className="h-4 w-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                ${job.salary_min?.toLocaleString() || 0} - ${job.salary_max?.toLocaleString() || 0}
+                                {/* THAY THẾ DÒNG CŨ BẰNG DÒNG NÀY */}
+                                {formatSalary(job.salary_min, job.salary_max)}
                             </div>
                         </div>
 

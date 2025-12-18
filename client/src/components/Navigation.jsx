@@ -62,6 +62,8 @@ const Navigation = () => {
                                         <NavLink to="/">Browse Jobs</NavLink>
                                         <NavLink to="/my-applications">Applications</NavLink>
                                         <NavLink to="/my-interviews">Interviews</NavLink>
+                                        <NavLink to="/my-roadmap">My Roadmap</NavLink> 
+                                        
                                         <Link to="/career-path" className="ml-2 px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-primary-600 to-secondary-600 hover:shadow-lg hover:shadow-primary-500/30 transition-all hover:-translate-y-0.5">
                                             🚀 Career AI
                                         </Link>

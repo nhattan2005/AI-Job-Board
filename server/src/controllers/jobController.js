@@ -44,11 +44,13 @@ const createJob = async (req, res) => {
 // Get all active jobs (Public)
 const getJobs = async (req, res) => {
     try {
+        // FIX: 
+        // 1. Dùng j.* để lấy toàn bộ cột của job (bao gồm salary_min, salary_max nếu có)
+        // 2. Lấy u.company_name và KHÔNG đổi tên thành 'company' để khớp với Frontend (job.company_name)
         const result = await db.query(`
             SELECT 
-                j.id, j.title, j.description, j.location, j.salary_range, 
-                j.employment_type, j.status, j.created_at,
-                u.company_name as company
+                j.*, 
+                u.company_name
             FROM jobs j
             LEFT JOIN users u ON j.employer_id = u.id
             WHERE j.status = 'active'
@@ -61,27 +63,42 @@ const getJobs = async (req, res) => {
     }
 };
 
+// Get all jobs (Admin or Employer)
+const getAllJobs = async (req, res) => {
+    try {
+        // FIX: Join với bảng users để lấy company_name
+        const result = await db.query(`
+            SELECT j.*, u.company_name 
+            FROM jobs j 
+            JOIN users u ON j.employer_id = u.id 
+            ORDER BY j.created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching jobs:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
 // Get a job by ID (Public)
 const getJobById = async (req, res) => {
     const { id } = req.params;
     try {
+        // FIX: Join với bảng users để lấy company_name cho trang chi tiết
         const result = await db.query(`
-            SELECT 
-                j.id, j.title, j.description, j.location, j.salary_range, 
-                j.employment_type, j.status, j.created_at,
-                u.company_name as company, u.company_description, u.website
-            FROM jobs j
-            LEFT JOIN users u ON j.employer_id = u.id
+            SELECT j.*, u.company_name 
+            FROM jobs j 
+            JOIN users u ON j.employer_id = u.id 
             WHERE j.id = $1
         `, [id]);
-        
+
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Job not found' });
         }
-        res.status(200).json(result.rows[0]);
+        res.json(result.rows[0]);
     } catch (error) {
         console.error('Error fetching job:', error);
-        res.status(500).json({ error: 'Failed to fetch job' });
+        res.status(500).json({ error: 'Server error' });
     }
 };
 
@@ -146,6 +163,7 @@ const getJobApplications = async (req, res) => {
 module.exports = {
     createJob,
     getJobs,
+    getAllJobs,
     getJobById,
     getMyJobs,
     getJobApplications  // Add this export
