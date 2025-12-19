@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import axios from 'axios';
 
 const InterviewSchedulePage = () => {
     const { applicationId } = useParams();
@@ -52,7 +51,7 @@ const InterviewSchedulePage = () => {
         setError(null);
 
         try {
-            await api.post('/interviews/confirm', {
+            await api.post('/interviews/confirm', { // ← ĐÚNG: Gọi confirm interview thật
                 interviewId: interview.id,
                 slotId: selectedSlotId
             });
