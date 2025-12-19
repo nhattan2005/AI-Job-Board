@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const InterviewSchedulePage = () => {
@@ -26,7 +26,7 @@ const InterviewSchedulePage = () => {
     const fetchInterviewDetails = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`/api/interviews/application/${applicationId}`);
+            const response = await axios.get(`/interviews/application/${applicationId}`);
             setInterview(response.data.interview);
             
             const confirmedSlot = response.data.interview.timeSlots.find(s => s.is_selected);
@@ -51,7 +51,7 @@ const InterviewSchedulePage = () => {
         setError(null);
 
         try {
-            await axios.post('/api/interviews/confirm', {
+            await api.post('/interviews/confirm', {
                 interviewId: interview.id,
                 slotId: selectedSlotId
             });
