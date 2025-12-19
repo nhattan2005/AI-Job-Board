@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import InterviewCalendar from './InterviewCalendar';
 import axios from 'axios';
+import api from '../services/api'; // SỬA DÒNG NÀY
 
 const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSent }) => {
     const [timeSlots, setTimeSlots] = useState([]);
@@ -59,7 +60,7 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
         setError(null);
 
         try {
-            const response = await axios.post('/api/interviews/send-invitation', {
+            const response = await api.post('/interviews/send-invitation', {
                 applicationId: application.id,
                 timeSlots,
                 location,
@@ -72,7 +73,7 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
             
             // Gửi email
             const scheduleLink = `${window.location.origin}/interview/schedule/${application.id}`;
-            await axios.post('/api/employer/send-bulk-email', {
+            await api.post('/employer/send-bulk-email', { // ← ĐÚNG
                 applicationIds: [application.id],
                 subject: `Interview Invitation - ${jobTitle}`,
                 message: `Dear ${application.candidate_name},

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 const CVUpload = () => {
     const [cvFile, setCvFile] = useState(null);
@@ -53,7 +53,7 @@ const CVUpload = () => {
         setMessage('');
 
         try {
-            const response = await axios.post('/api/cv/upload', formData, {
+            const response = await api.post('/cv/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },

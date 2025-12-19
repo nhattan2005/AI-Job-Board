@@ -38,14 +38,14 @@ const CareerPath = () => {
                 const formData = new FormData();
                 formData.append('cv', cvFile);
 
-                response = await axios.post('/api/career/generate', formData, {
+                response = await api.post('/career/generate', formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data'
                     }
                 });
             } else if (!useFileUpload && cvText.trim()) {
                 // Send text
-                response = await axios.post('/api/career/generate', {
+                response = await api.post('/career/generate', {
                     cvText: cvText
                 });
             } else {

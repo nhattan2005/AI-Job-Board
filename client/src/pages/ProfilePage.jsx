@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const ProfilePage = () => {
@@ -66,7 +66,7 @@ const ProfilePage = () => {
                 updateData.website = website;
             }
 
-            const response = await axios.patch('/api/auth/profile', updateData);
+            const response = await api.put('/auth/profile', updateData);
             updateUser(response.data.user);
             setSuccess('Profile updated successfully!');
         } catch (err) {
@@ -94,7 +94,7 @@ const ProfilePage = () => {
         setLoading(true);
 
         try {
-            await axios.patch('/api/auth/change-password', {
+            await api.post('/auth/change-password', {
                 currentPassword,
                 newPassword
             });
