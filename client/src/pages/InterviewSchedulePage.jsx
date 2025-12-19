@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 
 const InterviewSchedulePage = () => {
     const { applicationId } = useParams();
@@ -26,7 +27,7 @@ const InterviewSchedulePage = () => {
     const fetchInterviewDetails = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`/interviews/application/${applicationId}`);
+            const response = await api.get(`/interviews/application/${applicationId}`);
             setInterview(response.data.interview);
             
             const confirmedSlot = response.data.interview.timeSlots.find(s => s.is_selected);
