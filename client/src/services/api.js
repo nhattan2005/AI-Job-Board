@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-// Tạo instance của axios
+// Log để debug
+console.log('🔗 API Base URL:', import.meta.env.VITE_API_URL);
+
 const api = axios.create({
-    // Tự động lấy URL từ biến môi trường hoặc dùng localhost:5000
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
     headers: {
         'Content-Type': 'application/json',
