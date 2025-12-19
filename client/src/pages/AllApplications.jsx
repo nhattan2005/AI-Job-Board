@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 
 const AllApplications = () => {
     const [applications, setApplications] = useState([]);
@@ -15,7 +15,7 @@ const AllApplications = () => {
     const fetchAllApplications = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/employer/all-applications');
+            const response = await api.get('/employer/all-applications'); // ← ĐÚNG
             setApplications(response.data.applications);
         } catch (error) {
             console.error('Error fetching applications:', error);
@@ -27,13 +27,13 @@ const AllApplications = () => {
 
     const updateApplicationStatus = async (applicationId, newStatus) => {
         try {
-            await axios.patch(`/api/applications/${applicationId}/status`, {
+            await api.patch(`/applications/${applicationId}/status`, { // ← ĐÚNG
                 status: newStatus
             });
             fetchAllApplications();
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update application status');
+            alert('Failed to update status');
         }
     };
 

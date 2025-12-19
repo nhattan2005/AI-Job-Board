@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const JobForm = () => {
@@ -23,14 +23,13 @@ const JobForm = () => {
         setLoading(true);
 
         try {
-            const response = await axios.post('/api/jobs', {
+            const response = await api.post('/jobs', {
                 title,
                 description,
                 location,
                 salary_range: salaryRange,
                 employment_type: employmentType
             });
-            
             setSuccess('Job posted successfully!');
             
             // Reset form

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 
 const MyApplications = () => {
     const [applications, setApplications] = useState([]);
@@ -14,7 +14,7 @@ const MyApplications = () => {
     const fetchApplications = async () => {
         try {
             setLoading(true);
-            const response = await axios.get('/api/applications/my-applications');
+            const response = await api.get('/applications/my-applications'); // ← ĐÚNG
             setApplications(response.data.applications);
         } catch (error) {
             console.error('Error fetching applications:', error);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import EmailTemplateModal from '../components/EmailTemplateModal';
 import InterviewInvitationModal from '../components/InterviewInvitationModal';
 
@@ -29,10 +29,10 @@ const EmployerApplications = () => {
     const fetchJobAndApplications = async () => {
         try {
             setLoading(true);
-            const jobResponse = await axios.get(`/api/jobs/${jobId}`);
+            const jobResponse = await api.get(`/jobs/${jobId}`); // ← ĐÚNG
             setJob(jobResponse.data);
             
-            const appsResponse = await axios.get(`/api/jobs/${jobId}/applications`);
+            const appsResponse = await api.get(`/jobs/${jobId}/applications`); // ← ĐÚNG
             setApplications(appsResponse.data.applications);
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -44,7 +44,7 @@ const EmployerApplications = () => {
 
     const updateApplicationStatus = async (applicationId, newStatus) => {
         try {
-            await axios.patch(`/api/applications/${applicationId}/status`, {
+            await api.patch(`/applications/${applicationId}/status`, { // ← ĐÚNG
                 status: newStatus
             });
             // Optimistic update
@@ -53,7 +53,7 @@ const EmployerApplications = () => {
             ));
         } catch (error) {
             console.error('Error updating status:', error);
-            alert('Failed to update application status');
+            fetchJobAndApplications();
         }
     };
 

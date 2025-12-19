@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const MyInterviews = () => {
@@ -18,10 +18,10 @@ const MyInterviews = () => {
         try {
             setLoading(true);
             const endpoint = isCandidate 
-                ? '/api/interviews/candidate/list' 
-                : '/api/interviews/employer/list';
+                ? '/interviews/candidate/list'  // ← ĐÚNG
+                : '/interviews/employer/list';  // ← ĐÚNG
             
-            const response = await axios.get(endpoint);
+            const response = await api.get(endpoint); // ← ĐÚNG
             setInterviews(response.data.interviews);
         } catch (err) {
             console.error('Error fetching interviews:', err);

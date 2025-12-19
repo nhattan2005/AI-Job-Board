@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api'; // SỬA DÒNG NÀY
 import { useAuth } from '../context/AuthContext';
 
 const EmployerDashboard = () => {
@@ -23,12 +23,12 @@ const EmployerDashboard = () => {
         try {
             setLoading(true);
             
-            // Fetch jobs
-            const jobsResponse = await axios.get('/api/jobs/my-jobs');
+            // Fetch jobs - SỬA: Dùng api service và xóa /api
+            const jobsResponse = await api.get('/jobs/my-jobs');
             setJobs(jobsResponse.data);
             
-            // Fetch stats
-            const statsResponse = await axios.get('/api/employer/stats');
+            // Fetch stats - SỬA: Dùng api service và xóa /api
+            const statsResponse = await api.get('/employer/stats');
             setStats(statsResponse.data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
