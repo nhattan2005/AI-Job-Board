@@ -20,11 +20,20 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: [
+        process.env.CORS_ORIGIN || 'http://localhost:3000',
+        /\.vercel\.app$/, // Cho phép tất cả subdomain của Vercel
+    ],
     credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Thêm middleware để log requests
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+    next();
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
