@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -58,6 +58,7 @@ const SuggestionAccordion = ({ suggestion, index }) => {
 };
 
 const JobDetail = () => {
+    const navigate = useNavigate(); // Hook điều hướng
     const { id } = useParams();
     const { isAuthenticated, isCandidate } = useAuth();
     const [job, setJob] = useState(null);
@@ -274,10 +275,11 @@ const JobDetail = () => {
                             <div className="p-8">
                                 <div className="mb-6">
                                     <label className="block text-sm font-bold text-slate-700 mb-3">1. Upload Your CV (PDF)</label>
-                                    <input type="file" accept=".pdf" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer border border-slate-200 rounded-xl p-1" />
+                                    <div className="relative group">
+                                        <input type="file" accept=".pdf" onChange={handleFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer border border-slate-200 rounded-xl p-1" />
+                                    </div>
                                 </div>
 
-                                {/* Unified Action Button */}
                                 <button 
                                     onClick={handleAnalyzeCV} 
                                     disabled={!cvFile || analyzing} 
@@ -290,7 +292,7 @@ const JobDetail = () => {
                                         </>
                                     ) : (
                                         <>
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                                             Analyze CV & Match
                                         </>
                                     )}
@@ -315,7 +317,6 @@ const JobDetail = () => {
                                                         style={{ width: `${matchScore}%` }}
                                                     ></div>
                                                 </div>
-                                                <p className="text-right text-xs text-slate-500 mt-2">Based on keyword and semantic analysis</p>
                                             </div>
                                         )}
 
@@ -323,7 +324,7 @@ const JobDetail = () => {
                                         {aiSuggestions && (
                                             <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
                                                 <h3 className="font-bold text-slate-800 mb-4 flex items-center text-lg">
-                                                    <svg className="w-6 h-6 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                    <svg className="w-6 h-6 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                                                     Skill Gap Analysis
                                                 </h3>
                                                 
@@ -333,9 +334,10 @@ const JobDetail = () => {
                                                         <div>
                                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Missing Hard Skills</p>
                                                             <div className="flex flex-wrap gap-2">
-                                                                {aiSuggestions.missingSkills.map((k, i) => (
-                                                                    <span key={i} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-sm font-semibold rounded-lg border border-amber-100">
-                                                                        {k}
+                                                                {aiSuggestions.missingSkills.map((skill, i) => (
+                                                                    <span key={i} className="px-3 py-1 bg-red-50 text-red-600 rounded-lg text-sm font-medium border border-red-100 flex items-center">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></span>
+                                                                        {skill}
                                                                     </span>
                                                                 ))}
                                                             </div>
@@ -363,7 +365,7 @@ const JobDetail = () => {
                                         {aiSuggestions?.suggestions?.length > 0 && (
                                             <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-100">
                                                 <h3 className="font-bold text-blue-900 mb-4 flex items-center text-lg">
-                                                    <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                                                    <svg className="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                                                     Smart Suggestions
                                                 </h3>
                                                 <div>
@@ -373,12 +375,73 @@ const JobDetail = () => {
                                                 </div>
                                             </div>
                                         )}
+
                                     </div>
                                 )}
                             </div>
                         </div>
+                    )} {/* Đóng khối AI Application Assistant */}
+
+                    {/* --- MOVED OUTSIDE: AI MOCK INTERVIEW CARD (Always Visible) --- */}
+                    {isAuthenticated && isCandidate && (
+                        <div className="mt-8 bg-gradient-to-br from-indigo-900 to-purple-900 rounded-2xl shadow-soft overflow-hidden relative text-white">
+                            {/* Background Effect */}
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
+                            
+                            <div className="p-8 relative z-10">
+                                <div className="flex items-start justify-between mb-6">
+                                    <div>
+                                        <h3 className="text-2xl font-bold flex items-center mb-2">
+                                            <span className="mr-3 text-3xl">🎙️</span> 
+                                            AI Mock Interview
+                                        </h3>
+                                        <p className="text-indigo-200 max-w-xl text-sm md:text-base">
+                                            Practice answering real interview questions generated from this specific Job Description. 
+                                            Get instant feedback on your answers and speaking confidence.
+                                        </p>
+                                    </div>
+                                    <div className="hidden md:block bg-white/10 p-3 rounded-xl backdrop-blur-sm">
+                                        <svg className="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <button
+                                        onClick={() => navigate(`/interview/${id}/HR`)}
+                                        className="group relative flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all hover:scale-[1.02]"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-purple-500/20 p-2 rounded-lg">
+                                                <span className="text-2xl">👤</span>
+                                            </div>
+                                            <div className="text-left">
+                                                <div className="font-bold">HR Round</div>
+                                                <div className="text-xs text-indigo-200">Behavioral & Culture Fit</div>
+                                            </div>
+                                        </div>
+                                        <svg className="w-5 h-5 text-white/50 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                    </button>
+
+                                    <button
+                                        onClick={() => navigate(`/interview/${id}/Tech_Lead`)}
+                                        className="group relative flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all hover:scale-[1.02]"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-blue-500/20 p-2 rounded-lg">
+                                                <span className="text-2xl">💻</span>
+                                            </div>
+                                            <div className="text-left">
+                                                <div className="font-bold">Technical Round</div>
+                                                <div className="text-xs text-indigo-200">Coding & System Design</div>
+                                            </div>
+                                        </div>
+                                        <svg className="w-5 h-5 text-white/50 group-hover:text-white transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
-                </div>
+                </div> {/* Đóng thẻ div bao quanh cột trái (Left Column) */}
 
                 {/* RIGHT COLUMN - Sticky Sidebar */}
                 <div className="space-y-6 sticky top-24">

@@ -11,6 +11,7 @@ const careerRoutes = require('./routes/careerRoutes');
 const employerRoutes = require('./routes/employerRoutes');
 const employerEmailRoutes = require('./routes/employerEmailRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
+const mockInterviewRoutes = require('./routes/mockInterviewRoutes');
 const errorHandler = require('./middleware/errorHandler');
 const db = require('./config/database');
 
@@ -34,6 +35,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/employer', employerRoutes);
 app.use('/api/interviews', interviewRoutes);
 app.use('/api/career', careerRoutes);
+app.use('/api/mock-interview', mockInterviewRoutes);
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

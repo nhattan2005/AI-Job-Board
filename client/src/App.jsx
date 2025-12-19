@@ -19,6 +19,8 @@ import MyInterviews from './pages/MyInterviews';
 import CareerPath from './pages/CareerPath'; // <-- Đảm bảo dòng này tồn tại
 import ProfilePage from './pages/ProfilePage'; // <-- Đảm bảo dòng này tồn tại
 import MyCareerRoadmap from './pages/MyCareerRoadmap'; // Import trang mới
+import InterviewRoom from './pages/InterviewRoom'; // Import trang mới
+import InterviewFeedback from './pages/InterviewFeedback'; // THÊM IMPORT
 
 const App = () => {
     return (
@@ -35,6 +37,26 @@ const App = () => {
                             <Route path="/register" element={<RegisterPage />} />
                             <Route path="/career-path" element={<CareerPath />} />
                             
+                            {/* Thêm Route cho AI Interview */}
+                            <Route 
+                                path="/interview/:jobId/:type" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <InterviewRoom />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            
+                            {/* THÊM ROUTE NÀY */}
+                            <Route 
+                                path="/interview/feedback/:sessionId" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <InterviewFeedback />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
                             {/* Protected Routes */}
                             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
                             

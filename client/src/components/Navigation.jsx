@@ -64,6 +64,11 @@ const Navigation = () => {
                                         <NavLink to="/my-interviews">Interviews</NavLink>
                                         <NavLink to="/my-roadmap">My Roadmap</NavLink> 
                                         
+                                        {/* ADDED LINK HERE */}
+                                        <Link to="/" onClick={() => setTimeout(() => document.getElementById('job-list-section')?.scrollIntoView({ behavior: 'smooth' }), 100)} className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:text-primary-600 hover:bg-slate-50 transition-colors">
+                                            🎙️ Practice Interview
+                                        </Link>
+
                                         <Link to="/career-path" className="ml-2 px-4 py-2 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-primary-600 to-secondary-600 hover:shadow-lg hover:shadow-primary-500/30 transition-all hover:-translate-y-0.5">
                                             🚀 Career AI
                                         </Link>

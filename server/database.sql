@@ -14,8 +14,14 @@ DROP TYPE IF EXISTS user_role CASCADE;
 -- Enable the pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Create ENUM for user roles
 CREATE TYPE user_role AS ENUM ('candidate', 'employer');
+
+-- Create Enum for Interview Type
+CREATE TYPE interview_type AS ENUM ('HR', 'Tech_Lead');
 
 -- Create users table with role-based fields
 CREATE TABLE users (
@@ -149,6 +155,30 @@ CREATE TABLE interview_time_slots (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create Mock Interviews Table
+CREATE TABLE mock_interviews (
+    session_id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_id INT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    interview_type interview_type NOT NULL,
+    
+    -- Stores array of objects: [{role: 'user'|'model', text: '...', timestamp: '...'}]
+    chat_history JSONB DEFAULT '[]'::jsonb,
+    
+    -- Stores fluency data: { hesitation_count: 0, wpm_avg: 0, total_duration: 0 }
+    audio_metrics JSONB DEFAULT '{}'::jsonb,
+    
+    overall_score INT, -- 0 to 100
+    final_feedback TEXT,
+    
+    status VARCHAR(20) DEFAULT 'active', -- active, completed
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster lookups
+CREATE INDEX idx_mock_interviews_user ON mock_interviews(user_id);
+
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -236,6 +266,12 @@ INSERT INTO interview_time_slots (interview_id, slot_date, is_selected) VALUES
 (2, '2024-12-21 14:00:00', FALSE),
 (2, '2024-12-21 15:00:00', TRUE)
 ON CONFLICT DO NOTHING;
+
+-- Sample Mock Interviews
+INSERT INTO mock_interviews (user_id, job_id, interview_type, chat_history, audio_metrics, overall_score, final_feedback, status) VALUES
+(1, 1, 'HR', '[{"role": "user", "text": "Tell me about yourself.", "timestamp": "2024-12-01T10:00:00Z"}, {"role": "model", "text": "I am a full-stack developer...", "timestamp": "2024-12-01T10:00:05Z"}]', '{"hesitation_count": 2, "wpm_avg": 150, "total_duration": 120}', 75, 'Good communication, but needs to improve technical details.', 'active'),
+(2, 2, 'Tech_Lead', '[{"role": "user", "text": "What is your experience with React?", "timestamp": "2024-12-02T14:00:00Z"}, {"role": "model", "text": "I have 4 years of experience...", "timestamp": "2024-12-02T14:00:05Z"}]', '{"hesitation_count": 1, "wpm_avg": 160, "total_duration": 90}', 85, 'Strong React knowledge, good problem-solving skills.', 'active')
+ON CONFLICT (session_id) DO NOTHING;
 
 -- Success message
 DO $$ 
