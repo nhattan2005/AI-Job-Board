@@ -6,17 +6,17 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 async function testConfiguration() {
     console.log('=== Testing Final AI Configuration ===\n');
     
-    // Test 1: Text Generation with gemini-2.5-flash
+    // Test 1: Text Generation with gemini-flash-latest
     try {
-        console.log('1. Testing gemini-2.5-flash for text generation...');
-        const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        console.log('1. Testing gemini-flash-latestest for text generation...');
+        const chatModel = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
         const result = await chatModel.generateContent('Say "Configuration successful!" in one sentence.');
         const response = await result.response;
-        console.log('✅ gemini-2.5-flash works!');
+        console.log('✅ gemini-flash-latest works!');
         console.log('Response:', response.text());
         console.log();
     } catch (error) {
-        console.log('❌ gemini-2.5-flash failed:', error.message);
+        console.log('❌ gemini-flash-latest failed:', error.message);
         console.log();
         return;
     }
@@ -68,7 +68,7 @@ async function testConfiguration() {
         console.log('   ✓ Match score:', Math.round(similarity * 100) / 100, '%');
         
         console.log('   d) Generating AI advice...');
-        const chatModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const chatModel = genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
         const prompt = `Analyze this CV against the job. Give 2 quick tips in JSON: {"tips": ["tip1", "tip2"]}
 
 Job: ${jobDesc}
@@ -90,7 +90,7 @@ CV: ${cvText}`;
     console.log('=== Configuration Test Complete ===');
     console.log('\n✅ All systems ready! You can now:');
     console.log('   1. Calculate match scores (using text-embedding-004)');
-    console.log('   2. Get AI suggestions (using gemini-2.5-flash)');
+    console.log('   2. Get AI suggestions (using gemini-flash-latest)');
     console.log('   3. All vectors use 768 dimensions (matching PostgreSQL schema)');
 }
 

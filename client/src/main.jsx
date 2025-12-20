@@ -4,12 +4,11 @@ import axios from 'axios';
 import App from './App';
 import './styles/index.css';
 
-// Configure axios defaults - Dùng biến môi trường thay vì hardcode
 // Log để debug
 console.log('🔗 VITE_API_URL:', import.meta.env.VITE_API_URL);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+  // <React.StrictMode> {/* ← TẠM THỜI COMMENT RA */}
     <App />
-  </React.StrictMode>
+  // </React.StrictMode>
 );

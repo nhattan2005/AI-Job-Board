@@ -43,7 +43,7 @@ node test-final-config.js
 
 Expected output:
 ```
-✅ gemini-2.5-flash works!
+✅ gemini-flash-latest works!
 ✅ text-embedding-004 works!
 ✅ Correct dimension: 768
 ✅ Full workflow test PASSED!

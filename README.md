@@ -38,7 +38,7 @@ Nền tảng tuyển dụng IT hiện đại tích hợp trí tuệ nhân tạo 
 - **Frontend**: React.js (Vite), TailwindCSS, Axios, React Router v6.
 - **Backend**: Node.js, Express.js.
 - **Database**: PostgreSQL (với extension `pgvector`).
-- **AI Model**: Google Gemini (`gemini-2.5-flash` cho text, `text-embedding-004` cho vector).
+- **AI Model**: Google Gemini (`gemini-flash-latest` cho text, `text-embedding-004` cho vector).
 - **Authentication**: JWT (JSON Web Tokens).
 - **File Storage**: Multer (lưu trữ cục bộ hoặc memory).
 

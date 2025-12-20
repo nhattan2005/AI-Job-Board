@@ -7,7 +7,7 @@ const generateCareerPath = async (cvText) => {
         console.log('Initializing Gemini model for career analysis...');
         
         const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
+            model: "gemini-flash-latest",
             generationConfig: {
                 temperature: 0.7,
                 maxOutputTokens: 8192,
