@@ -419,8 +419,9 @@ const uploadAvatar = async (req, res) => {
         }
 
         const userId = req.user.id;
-        // Tạo đường dẫn URL (ví dụ: /uploads/avatars/filename.jpg)
-        const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+        
+        // 👇 QUAN TRỌNG: Cloudinary trả về URL trong req.file.path
+        const avatarUrl = req.file.path; 
 
         const result = await db.query(
             'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING avatar_url',

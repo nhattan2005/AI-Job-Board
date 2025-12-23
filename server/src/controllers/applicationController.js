@@ -3,28 +3,14 @@ const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const db = require('../config/database');
 const { embedCV } = require('../services/embeddingService');
-const path = require('path');
-const fs = require('fs'); // 👇 Import fs
+const { cloudinary } = require('../config/cloudinary'); // Import cloudinary
+const streamifier = require('streamifier'); // Cần cài thêm: npm install streamifier
 
-// 👇 1. CẤU HÌNH LƯU FILE VÀO Ổ CỨNG
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        // Đảm bảo thư mục này tồn tại
-        const uploadDir = 'uploads/cvs/';
-        if (!fs.existsSync(uploadDir)){
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        // Tên file: timestamp-tên-gốc
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
+// 👇 1. DÙNG MEMORY STORAGE (Lưu vào RAM để xử lý nhanh)
+const storage = multer.memoryStorage();
 
 const upload = multer({ 
-    storage: storage, // 👈 Sử dụng storage mới
+    storage: storage,
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = [
@@ -40,10 +26,27 @@ const upload = multer({
     }
 });
 
-// Helper to extract text from file
+// Helper upload buffer lên Cloudinary
+const uploadToCloudinary = (buffer, filename) => {
+    return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+            { 
+                folder: 'ai-job-board/cvs',
+                resource_type: 'raw', // Để giữ nguyên định dạng PDF/DOCX
+                public_id: filename.split('.')[0] + '-' + Date.now()
+            },
+            (error, result) => {
+                if (error) reject(error);
+                else resolve(result);
+            }
+        );
+        streamifier.createReadStream(buffer).pipe(uploadStream);
+    });
+};
+
+// Helper extract text (Sửa để đọc từ Buffer)
 const extractTextFromFile = async (file) => {
-    // 👇 VÌ DÙNG DISK STORAGE, CẦN ĐỌC FILE TỪ ĐƯỜNG DẪN
-    const buffer = fs.readFileSync(file.path);
+    const buffer = file.buffer; // 👇 Lấy từ buffer
     const { mimetype } = file;
     
     if (mimetype === 'text/plain') {
@@ -67,40 +70,21 @@ const applyForJob = async (req, res) => {
 
         const candidate_id = req.user.id;
         const { job_id, cover_letter } = req.body;
-        
-        // 👇 LẤY ĐƯỜNG DẪN FILE ĐỂ LƯU DB
-        // Lưu ý: path.posix.join để đảm bảo dùng dấu / trên Windows
-        const filePath = `/uploads/cvs/${req.file.filename}`;
 
-        if (!job_id) {
-            return res.status(400).json({ error: 'Job ID is required' });
-        }
-
-        // Check if job exists
-        const jobCheck = await db.query('SELECT id FROM jobs WHERE id = $1 AND status = $2', [job_id, 'active']);
-        if (jobCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'Job not found or no longer active' });
-        }
-
-        // Check if already applied
-        const existingApp = await db.query(
-            'SELECT id FROM applications WHERE job_id = $1 AND candidate_id = $2',
-            [job_id, candidate_id]
-        );
-        if (existingApp.rows.length > 0) {
-            return res.status(400).json({ error: 'You have already applied for this job' });
-        }
-
-        // Extract CV text
+        // 1. Extract Text từ RAM
         const cvText = await extractTextFromFile(req.file);
         if (!cvText || cvText.trim().length === 0) {
             return res.status(400).json({ error: 'Could not extract text from CV file' });
         }
 
-        // Generate embedding
+        // 2. Upload file lên Cloudinary
+        const cloudResult = await uploadToCloudinary(req.file.buffer, req.file.originalname);
+        const filePath = cloudResult.secure_url; // 👇 URL từ Cloudinary
+
+        // 3. Generate embedding
         const cvVector = await embedCV(cvText);
 
-        // 👇 CẬP NHẬT QUERY: LƯU THÊM file_path
+        // 4. Lưu vào DB (Lưu URL Cloudinary vào file_path)
         const cvResult = await db.query(
             `INSERT INTO cvs (candidate_id, filename, cv_text, vector, file_path) 
              VALUES ($1, $2, $3, $4, $5) 
@@ -127,6 +111,7 @@ const applyForJob = async (req, res) => {
                 applied_at: appResult.rows[0].applied_at
             }
         });
+
     } catch (error) {
         console.error('Error applying for job:', error);
         res.status(500).json({ error: 'Failed to submit application', details: error.message });
