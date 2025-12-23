@@ -63,6 +63,15 @@ const EmployerApplications = () => {
     };
 
     const downloadCV = (app) => {
+        // 1. Ưu tiên tải file gốc nếu có đường dẫn
+        if (app.file_path) {
+            const fileUrl = `http://localhost:5000${app.file_path}`;
+            // Mở trong tab mới để trình duyệt tự xử lý (download hoặc view PDF)
+            window.open(fileUrl, '_blank');
+            return;
+        }
+
+        // 2. Fallback: Nếu là CV cũ chưa có file gốc, tải text file như trước
         if (!app.cv_text) {
             alert('No CV text available');
             return;
@@ -262,12 +271,25 @@ const EmployerApplications = () => {
                                         )}
 
                                         {(app.status.includes('interview')) && (
-                                            <button 
-                                                onClick={() => updateApplicationStatus(app.id, 'accepted')}
-                                                className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 shadow-sm transition"
-                                            >
-                                                Hire
-                                            </button>
+                                            <>
+                                                <button 
+                                                    onClick={() => updateApplicationStatus(app.id, 'accepted')}
+                                                    className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 shadow-sm transition"
+                                                >
+                                                    Hire
+                                                </button>
+                                                
+                                                <button 
+                                                    onClick={() => {
+                                                        if(window.confirm('Are you sure you want to reject this candidate?')) {
+                                                            updateApplicationStatus(app.id, 'rejected');
+                                                        }
+                                                    }}
+                                                    className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 text-sm font-bold rounded-lg hover:bg-red-100 transition"
+                                                >
+                                                    Reject
+                                                </button>
+                                            </>
                                         )}
 
                                         {/* Expand Toggle */}

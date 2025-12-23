@@ -197,17 +197,30 @@ const JobDetail = () => {
         return 'text-red-600';
     };
 
-    // Thêm hàm này vào bên trong component JobDetail (trước return)
-    const formatSalary = (min, max) => {
+    // SỬA LẠI HÀM NÀY (nằm bên trong component JobDetail, trước return)
+    const formatSalary = (job) => {
+        if (job.salary_range) return job.salary_range;
+
+        const min = job.salary_min;
+        const max = job.salary_max;
+
         if (!min && !max) return "Negotiable";
         if (min === 0 && max === 0) return "Negotiable";
         
         const format = (n) => n?.toLocaleString('en-US');
         
-        if (min && !max) return `From $${format(min)}`;
-        if (!min && max) return `Up to $${format(max)}`;
+        if (min && (!max || max === 0)) return `From $${format(min)}`;
+        if ((!min || min === 0) && max) return `Up to $${format(max)}`;
         return `$${format(min)} - $${format(max)}`;
     };
+
+    // Helper lấy URL ảnh
+    const getImageUrl = (path) => path ? `http://localhost:5000${path}` : null;
+
+    // Helper để kiểm tra deadline
+    const isExpired = job?.deadline && new Date(job.deadline) < new Date();
+    const isClosed = job?.status === 'closed';
+    const canApply = !isExpired && !isClosed;
 
     if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     if (error) return <div className="text-center py-20 text-red-600 font-bold">{error}</div>;
@@ -227,10 +240,25 @@ const JobDetail = () => {
                         <div className="flex items-start justify-between gap-4 mb-6">
                             <div>
                                 <h1 className="text-3xl font-bold text-slate-900 mb-2">{job.title}</h1>
-                                <div className="flex items-center gap-2 text-lg font-medium text-slate-600">
-                                    <span className="text-primary-600">{job.company_name}</span>
-                                    <span className="text-slate-300">•</span>
-                                    <span>{job.location}</span>
+                                <div className="flex items-center gap-3">
+                                    {/* 👇 THÊM AVATAR VÀO ĐÂY */}
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                                        {job.avatar_url ? (
+                                            <img 
+                                                src={getImageUrl(job.avatar_url)} 
+                                                alt={job.company_name} 
+                                                className="w-full h-full object-cover"
+                                            />
+                                        ) : (
+                                            <span className="font-bold text-slate-500">{job.company_name?.charAt(0)}</span>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 text-lg font-medium text-slate-600">
+                                        <span className="text-primary-600">{job.company_name}</span>
+                                        <span className="text-slate-300">•</span>
+                                        <span>{job.location}</span>
+                                    </div>
                                 </div>
                             </div>
                             {hasApplied && (
@@ -245,11 +273,22 @@ const JobDetail = () => {
                             <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-sm font-medium flex items-center">
                                 💼 {job.employment_type}
                             </span>
-                            
-                            {/* FIX: Sử dụng hàm formatSalary thay vì hiển thị trực tiếp */}
                             <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-sm font-medium flex items-center">
-                                💰 {formatSalary(job.salary_min, job.salary_max)}
+                                💰 {formatSalary(job)}
                             </span>
+                            
+                            {/* 👇 HIỂN THỊ SỐ LƯỢNG APPLY */}
+                            <span className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium flex items-center">
+                                👥 {job.application_count || 0} Applicants
+                            </span>
+
+                            {/* 👇 HIỂN THỊ DEADLINE */}
+                            {job.deadline && (
+                                <span className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center ${isExpired ? 'bg-red-100 text-red-700' : 'bg-orange-50 text-orange-700'}`}>
+                                    ⏰ Deadline: {new Date(job.deadline).toLocaleDateString()}
+                                    {isExpired && ' (Expired)'}
+                                </span>
+                            )}
                         </div>
 
                         <div className="prose prose-slate max-w-none">
@@ -450,11 +489,23 @@ const JobDetail = () => {
                         {isAuthenticated ? (
                             isCandidate ? (
                                 <>
-                                    <textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} rows="4" className="w-full px-4 py-3 rounded-xl border border-slate-200 mb-4 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition" placeholder="Cover Letter (Optional)" />
-                                    <button onClick={handleApply} disabled={loadingApply || hasApplied || !cvFile} className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
-                                        {loadingApply ? 'Sending...' : hasApplied ? 'Applied' : 'Apply Now'}
-                                    </button>
-                                    {!cvFile && !hasApplied && <p className="text-xs text-red-500 mt-2 text-center font-medium">Please upload CV to apply</p>}
+                                    {/* 👇 LOGIC KHÓA NÚT APPLY */}
+                                    {canApply ? (
+                                        <>
+                                            <textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} rows="4" className="w-full px-4 py-3 rounded-xl border border-slate-200 mb-4 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition" placeholder="Cover Letter (Optional)" />
+                                            <button onClick={handleApply} disabled={loadingApply || hasApplied || !cvFile} className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                                                {loadingApply ? 'Sending...' : hasApplied ? 'Applied' : 'Apply Now'}
+                                            </button>
+                                            {!cvFile && !hasApplied && <p className="text-xs text-red-500 mt-2 text-center font-medium">Please upload CV to apply</p>}
+                                        </>
+                                    ) : (
+                                        <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-center">
+                                            <p className="text-red-700 font-semibold">
+                                                {isClosed ? 'This job is closed.' : 'Application deadline has passed.'}
+                                            </p>
+                                            <p className="text-sm text-red-600 mt-1">You can no longer apply for this position.</p>
+                                        </div>
+                                    )}
                                 </>
                             ) : <div className="p-4 bg-slate-50 rounded-xl text-center text-sm text-slate-500">Employers cannot apply.</div>
                         ) : (

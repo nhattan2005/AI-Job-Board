@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import InterviewCalendar from './InterviewCalendar';
-import axios from 'axios';
-import api from '../services/api'; // SỬA DÒNG NÀY
+import api from '../services/api';
 
 const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSent }) => {
     const [timeSlots, setTimeSlots] = useState([]);
     const [location, setLocation] = useState('Online');
     const [meetingLink, setMeetingLink] = useState('');
+    // 👇 THÊM: State cho địa chỉ văn phòng
+    const [officeAddress, setOfficeAddress] = useState('');
     const [notes, setNotes] = useState('');
     const [duration, setDuration] = useState(60);
     const [sending, setSending] = useState(false);
@@ -21,7 +22,7 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
             setError('Please select both date and time');
             return;
         }
-
+        
         const slotDateTime = new Date(`${newSlotDate}T${newSlotTime}`);
         
         if (slotDateTime < new Date()) {
@@ -56,14 +57,24 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
             return;
         }
 
+        // 👇 THÊM: Validate địa chỉ văn phòng
+        if (location === 'Office' && !officeAddress.trim()) {
+            setError('Please provide the office address');
+            return;
+        }
+
         setSending(true);
         setError(null);
 
         try {
+            // 👇 LOGIC: Xác định location cuối cùng để lưu vào DB
+            // Nếu là Office thì lưu địa chỉ cụ thể, nếu không thì giữ nguyên (Online/Phone)
+            const finalLocation = location === 'Office' ? officeAddress : location;
+
             const response = await api.post('/interviews/send-invitation', {
                 applicationId: application.id,
                 timeSlots,
-                location,
+                location: finalLocation, // Sử dụng finalLocation
                 meetingLink: location === 'Online' ? meetingLink : null,
                 notes,
                 duration
@@ -73,24 +84,32 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
             
             // Gửi email
             const scheduleLink = `${window.location.origin}/interview/schedule/${application.id}`;
-            await api.post('/employer/send-bulk-email', { // ← ĐÚNG
+            
+            // 👇 LOGIC: Tạo nội dung chi tiết về địa điểm cho email
+            let locationDetails = `- Location: ${finalLocation}`;
+            if (location === 'Online') {
+                locationDetails += `\n- Meeting Link: ${meetingLink}`;
+            }
+
+            await api.post('/employer/send-bulk-email', {
                 applicationIds: [application.id],
                 subject: `Interview Invitation - ${jobTitle}`,
+                // 👇 SỬA LẠI PHẦN NÀY: Dùng thẻ <b> thay vì **
                 message: `Dear ${application.candidate_name},
 
 We are impressed with your application and would like to invite you for an interview.
 
-**Schedule Your Interview:**
-Please visit: ${scheduleLink}
+<b>Schedule Your Interview:</b>
+Please visit the link below to select a time slot that works for you:
+${scheduleLink}
 
-**Details:**
+<b>Interview Details:</b>
 - Duration: ${duration} minutes
-- Location: ${location}
-${location === 'Online' ? `- Meeting Link: ${meetingLink}` : ''}
+${locationDetails}
 
-${notes ? `\n**Notes:**\n${notes}` : ''}
+${notes ? `\n<b>Notes:</b>\n${notes}` : ''}
 
-Please confirm within 48 hours.
+Please confirm your preferred time slot within 48 hours.
 
 Best regards,
 Hiring Team`
@@ -102,6 +121,7 @@ Hiring Team`
                 setTimeSlots([]);
                 setLocation('Online');
                 setMeetingLink('');
+                setOfficeAddress(''); // Reset address
                 setNotes('');
                 setDuration(60);
                 setSuccess(false);
@@ -168,13 +188,37 @@ Hiring Team`
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
                                 Available Time Slots <span className="text-red-500">*</span>
                             </label>
-                            <p className="text-sm text-gray-600 mb-3">
-                                Click on dates and times in the calendar to select when you're available
-                            </p>
-                            <InterviewCalendar
-                                selectedSlots={timeSlots}
-                                onSlotsChange={setTimeSlots}
-                            />
+                            <div className="flex gap-2 mb-4">
+                                <input
+                                    type="date"
+                                    value={newSlotDate}
+                                    onChange={(e) => setNewSlotDate(e.target.value)}
+                                    className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                                <input
+                                    type="time"
+                                    value={newSlotTime}
+                                    onChange={(e) => setNewSlotTime(e.target.value)}
+                                    className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                                />
+                                <button
+                                    onClick={addTimeSlot}
+                                    className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 font-semibold"
+                                >
+                                    Add Slot
+                                </button>
+                            </div>
+                            
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <p className="text-sm text-gray-600 mb-3">
+                                    Click on dates and times in the calendar to select when you're available
+                                </p>
+                                <InterviewCalendar
+                                    selectedSlots={timeSlots}
+                                    onSlotsChange={setTimeSlots}
+                                />
+                            </div>
                         </div>
 
                         {/* Duration */}
@@ -230,6 +274,23 @@ Hiring Team`
                             </div>
                         )}
 
+                        {/* 👇 THÊM: Office Address Input */}
+                        {location === 'Office' && (
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Office Address <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={officeAddress}
+                                    onChange={(e) => setOfficeAddress(e.target.value)}
+                                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                                    placeholder="e.g. Floor 12, Bitexco Financial Tower, 2 Hai Trieu, District 1, HCMC"
+                                    disabled={sending}
+                                />
+                            </div>
+                        )}
+
                         {/* Notes */}
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -258,7 +319,7 @@ Hiring Team`
                     </button>
                     <button
                         onClick={handleSend}
-                        disabled={sending || timeSlots.length === 0 || (location === 'Online' && !meetingLink.trim())}
+                        disabled={sending || timeSlots.length === 0 || (location === 'Online' && !meetingLink.trim()) || (location === 'Office' && !officeAddress.trim())}
                         className="px-8 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition font-semibold disabled:opacity-50 flex items-center shadow-lg"
                     >
                         {sending ? (

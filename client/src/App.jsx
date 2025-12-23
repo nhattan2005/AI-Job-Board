@@ -21,6 +21,9 @@ import ProfilePage from './pages/ProfilePage'; // <-- Đảm bảo dòng này t�
 import MyCareerRoadmap from './pages/MyCareerRoadmap'; // Import trang mới
 import InterviewRoom from './pages/InterviewRoom'; // Import trang mới
 import InterviewFeedback from './pages/InterviewFeedback'; // THÊM IMPORT
+import VerifyEmailPage from './pages/VerifyEmailPage'; // THÊM
+import EmailVerifiedPage from './pages/EmailVerifiedPage'; // THÊM
+import VerifyEmailSentPage from './pages/VerifyEmailSentPage';
 
 const App = () => {
     return (
@@ -35,11 +38,25 @@ const App = () => {
                             <Route path="/jobs/:id" element={<JobDetail />} />
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/register" element={<RegisterPage />} />
-                            <Route path="/career-path" element={<CareerPath />} />
                             
-                            {/* Thêm Route cho AI Interview */}
+                            {/* Email Verification Routes */}
+                            <Route path="/verify-email" element={<VerifyEmailPage />} />
+                            <Route path="/verify-email-sent" element={<VerifyEmailSentPage />} />
+                            <Route path="/verify-email/:token" element={<EmailVerifiedPage />} />
+
+                            {/* 👇 1. THÊM ROUTE CHO CANDIDATE SCHEDULE (QUAN TRỌNG) */}
                             <Route 
-                                path="/interview/:jobId/:type" 
+                                path="/interview/schedule/:applicationId" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <InterviewSchedulePage />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
+                            {/* 👇 2. SỬA ROUTE AI INTERVIEW: Đổi từ /interview/... thành /ai-interview/... */}
+                            <Route 
+                                path="/ai-interview/:jobId/:type" 
                                 element={
                                     <ProtectedRoute requiredRole="candidate">
                                         <InterviewRoom />
@@ -47,7 +64,6 @@ const App = () => {
                                 } 
                             />
                             
-                            {/* THÊM ROUTE NÀY */}
                             <Route 
                                 path="/interview/feedback/:sessionId" 
                                 element={
@@ -97,6 +113,15 @@ const App = () => {
                             />
                             <Route 
                                 path="/employer/post-job" 
+                                element={
+                                    <ProtectedRoute requiredRole="employer">
+                                        <JobForm />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            {/* 👇 THÊM ROUTE NÀY */}
+                            <Route 
+                                path="/employer/edit-job/:id" 
                                 element={
                                     <ProtectedRoute requiredRole="employer">
                                         <JobForm />

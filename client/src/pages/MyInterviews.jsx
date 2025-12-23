@@ -46,8 +46,11 @@ const MyInterviews = () => {
         }
     };
 
-    const formatDate = (dateString) => {
-        if (!dateString) return 'Not scheduled';
+    // 👇 CẬP NHẬT HÀM NÀY
+    const formatDate = (dateString, status) => {
+        if (!dateString) {
+            return status === 'pending' ? 'Pending Confirmation' : 'Not scheduled';
+        }
         const date = new Date(dateString);
         return date.toLocaleString('en-US', {
             weekday: 'short',
@@ -195,7 +198,10 @@ const MyInterviews = () => {
                                         </svg>
                                         <div>
                                             <p className="text-xs text-gray-500">Date & Time</p>
-                                            <p className="font-semibold">{formatDate(interview.interview_date)}</p>
+                                            {/* 👇 CẬP NHẬT CÁCH GỌI HÀM: Truyền thêm interview.status */}
+                                            <p className={`font-semibold ${!interview.interview_date ? 'text-amber-600' : ''}`}>
+                                                {formatDate(interview.interview_date, interview.status)}
+                                            </p>
                                         </div>
                                     </div>
 

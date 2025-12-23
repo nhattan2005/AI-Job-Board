@@ -9,20 +9,21 @@ const JobList = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterLocation, setFilterLocation] = useState('');
 
-    // THÊM HÀM NÀY: Xử lý hiển thị lương
-    const formatSalary = (min, max) => {
-        // Nếu cả 2 đều null hoặc 0 -> Thỏa thuận
+    // SỬA LẠI HÀM NÀY
+    const formatSalary = (job) => {
+        // 1. Ưu tiên hiển thị salary_range (chuỗi) nếu có
+        if (job.salary_range) return job.salary_range;
+
+        // 2. Fallback sang logic min/max cũ (nếu sau này bạn nâng cấp DB)
+        const min = job.salary_min;
+        const max = job.salary_max;
+
         if ((!min && !max) || (min === 0 && max === 0)) return "Negotiable";
         
         const format = (n) => n?.toLocaleString('en-US');
         
-        // Nếu chỉ có min -> From ...
         if (min && (!max || max === 0)) return `From $${format(min)}`;
-        
-        // Nếu chỉ có max -> Up to ...
         if ((!min || min === 0) && max) return `Up to $${format(max)}`;
-        
-        // Có cả 2 -> Range
         return `$${format(min)} - $${format(max)}`;
     };
 
@@ -60,6 +61,9 @@ const JobList = () => {
 
     if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     if (error) return <div className="text-center py-20 text-red-600">{error}</div>;
+
+    // Helper lấy URL ảnh
+    const getImageUrl = (path) => path ? `http://localhost:5000${path}` : null;
 
     return (
         <div className="max-w-7xl mx-auto pt-24 pb-12 px-4 sm:px-6">
@@ -138,8 +142,17 @@ const JobList = () => {
                         className="group bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col h-full"
                     >
                         <div className="flex justify-between items-start mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-xl font-bold text-slate-600 border border-slate-200">
-                                {job.company_name?.charAt(0) || 'C'}
+                            {/* 👇 THAY THẾ PHẦN HIỂN THỊ LOGO CŨ */}
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-xl font-bold text-slate-600 border border-slate-200 overflow-hidden">
+                                {job.avatar_url ? (
+                                    <img 
+                                        src={getImageUrl(job.avatar_url)} 
+                                        alt={job.company_name} 
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    job.company_name?.charAt(0) || 'C'
+                                )}
                             </div>
                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-700 border border-primary-100">
                                 {job.employment_type || 'Full-time'}
@@ -164,7 +177,7 @@ const JobList = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 {/* THAY THẾ DÒNG CŨ BẰNG DÒNG NÀY */}
-                                {formatSalary(job.salary_min, job.salary_max)}
+                                {formatSalary(job)}
                             </div>
                         </div>
 

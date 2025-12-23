@@ -1,6 +1,8 @@
 -- SQL script to set up the database for the AI-Powered IT Job Board
 
 -- Drop existing tables if recreating (in correct order - children first)
+DROP TABLE IF EXISTS user_roadmaps CASCADE;
+DROP TABLE IF EXISTS mock_interviews CASCADE;
 DROP TABLE IF EXISTS interview_time_slots CASCADE;
 DROP TABLE IF EXISTS interviews CASCADE;
 DROP TABLE IF EXISTS applications CASCADE;
@@ -8,8 +10,9 @@ DROP TABLE IF EXISTS cvs CASCADE;
 DROP TABLE IF EXISTS jobs CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
--- Drop the enum type if it exists
+-- Drop the enum types if they exist
 DROP TYPE IF EXISTS user_role CASCADE;
+DROP TYPE IF EXISTS interview_type CASCADE;
 
 -- Enable the pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -42,10 +45,18 @@ CREATE TABLE users (
     company_email VARCHAR(255),
     company_phone VARCHAR(50),
     
-    phone VARCHAR(20),  -- ← THÊM DÒNG NÀY
+    phone VARCHAR(20),
+    
+    -- Email verification fields
+    email_verified BOOLEAN DEFAULT FALSE,
+    verification_token VARCHAR(255),
+    verification_token_expires TIMESTAMP,
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Avatar URL for user profile picture
+    avatar_url VARCHAR(255),
     
     -- Constraints to ensure role-specific fields are set correctly
     CONSTRAINT candidate_fields_check CHECK (
@@ -58,8 +69,8 @@ CREATE TABLE users (
     )
 );
 
--- THÊM ĐOẠN NÀY: Bảng lưu lộ trình sự nghiệp
-CREATE TABLE IF NOT EXISTS user_roadmaps (
+-- Bảng lưu lộ trình sự nghiệp
+CREATE TABLE user_roadmaps (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     target_role VARCHAR(255),
@@ -80,7 +91,8 @@ CREATE TABLE jobs (
     vector VECTOR(768), -- Google Gemini text-embedding-004 uses 768 dimensions
     status VARCHAR(20) DEFAULT 'active', -- active, closed, draft
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deadline TIMESTAMP -- Thêm cột deadline vào bảng jobs
 );
 
 -- Create CVs table (linked to candidate)
@@ -90,7 +102,7 @@ CREATE TABLE cvs (
     filename VARCHAR(255) NOT NULL,
     cv_text TEXT NOT NULL,
     vector VECTOR(768), -- For similarity matching
-    file_path VARCHAR(500), -- Optional: if storing files on disk
+    file_path VARCHAR(255), -- Optional: if storing files on disk
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     -- One active CV per candidate
@@ -117,8 +129,6 @@ CREATE TABLE applications (
     -- Prevent duplicate applications
     CONSTRAINT unique_application UNIQUE (job_id, candidate_id)
 );
-
--- Add interview scheduling tables
 
 -- Table to store interview schedules
 CREATE TABLE interviews (
@@ -176,22 +186,20 @@ CREATE TABLE mock_interviews (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Index for faster lookups
-CREATE INDEX idx_mock_interviews_user ON mock_interviews(user_id);
-
 -- Indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-CREATE INDEX IF NOT EXISTS idx_jobs_employer ON jobs(employer_id);
-CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
-CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
-CREATE INDEX IF NOT EXISTS idx_applications_candidate ON applications(candidate_id);
-CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
-CREATE INDEX IF NOT EXISTS idx_cvs_candidate ON cvs(candidate_id);
-CREATE INDEX IF NOT EXISTS idx_interviews_application ON interviews(application_id);
-CREATE INDEX IF NOT EXISTS idx_interviews_status ON interviews(status);
-CREATE INDEX IF NOT EXISTS idx_interviews_date ON interviews(interview_date);
-CREATE INDEX IF NOT EXISTS idx_time_slots_interview ON interview_time_slots(interview_id);
+CREATE INDEX idx_mock_interviews_user ON mock_interviews(user_id);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_jobs_employer ON jobs(employer_id);
+CREATE INDEX idx_jobs_status ON jobs(status);
+CREATE INDEX idx_applications_job ON applications(job_id);
+CREATE INDEX idx_applications_candidate ON applications(candidate_id);
+CREATE INDEX idx_applications_status ON applications(status);
+CREATE INDEX idx_cvs_candidate ON cvs(candidate_id);
+CREATE INDEX idx_interviews_application ON interviews(application_id);
+CREATE INDEX idx_interviews_status ON interviews(status);
+CREATE INDEX idx_interviews_date ON interviews(interview_date);
+CREATE INDEX idx_time_slots_interview ON interview_time_slots(interview_id);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -281,4 +289,5 @@ BEGIN
     RAISE NOTICE '👤 Test accounts:';
     RAISE NOTICE '   Employer: employer1@example.com / password123';
     RAISE NOTICE '   Candidate: candidate1@example.com / password123';
+    RAISE NOTICE '🔐 Email verification fields added to users table';
 END $$;

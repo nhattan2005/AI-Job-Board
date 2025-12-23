@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path'); // Thêm dòng này ở đầu file
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
@@ -27,7 +28,11 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+app.use(cors());
 app.use(express.urlencoded({ extended: true }));
+
+// 👇 THÊM DÒNG NÀY: Cho phép truy cập thư mục uploads từ trình duyệt
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Thêm middleware để log requests
 app.use((req, res, next) => {
@@ -42,6 +47,7 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/cv', cvRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/employer', employerRoutes);
+app.use('/api/employer', employerEmailRoutes); // 👈 THÊM DÒNG NÀY
 app.use('/api/interviews', interviewRoutes);
 app.use('/api/career', careerRoutes);
 app.use('/api/mock-interview', mockInterviewRoutes);

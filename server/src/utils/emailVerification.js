@@ -1,0 +1,114 @@
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+
+// 👇 FIX HERE: Change createTransporter to createTransport
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+    }
+});
+
+const generateOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const generateVerificationToken = () => {
+    return crypto.randomBytes(32).toString('hex');
+};
+
+const sendOTPEmail = async (email, otp) => {
+    try {
+        const mailOptions = {
+            from: `"${process.env.COMPANY_NAME || 'AI Job Board'}" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: 'Email Verification - AI Job Board',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+                    <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <h2 style="color: #3b82f6; margin-bottom: 20px;">📧 Email Verification</h2>
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Thank you for registering with AI Job Board!
+                        </p>
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Your verification code is:
+                        </p>
+                        <div style="background-color: #eff6ff; border: 2px solid #3b82f6; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center;">
+                            <span style="font-size: 32px; font-weight: bold; color: #1e40af; letter-spacing: 8px;">${otp}</span>
+                        </div>
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            This code will expire in <strong>10 minutes</strong>.
+                        </p>
+                        <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                            If you didn't request this verification, please ignore this email.
+                        </p>
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✓ OTP sent to ${email}`);
+        return { success: true };
+    } catch (error) {
+        console.error(`✗ Failed to send OTP to ${email}:`, error.message);
+        return { success: false, error: error.message };
+    }
+};
+
+const sendVerificationLinkEmail = async (email, token) => {
+    try {
+        const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${token}`;
+        
+        const mailOptions = {
+            from: `"${process.env.COMPANY_NAME || 'AI Job Board'}" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: 'Verify Your Email - AI Job Board',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+                    <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <h2 style="color: #3b82f6; margin-bottom: 20px;">📧 Verify Your Email</h2>
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Thank you for registering with AI Job Board!
+                        </p>
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6;">
+                            Please click the button below to verify your email address:
+                        </p>
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${verificationUrl}" style="background-color: #3b82f6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Verify Email Address
+                            </a>
+                        </div>
+                        <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
+                            Or copy and paste this link into your browser:
+                        </p>
+                        <p style="color: #3b82f6; font-size: 14px; word-break: break-all;">
+                            ${verificationUrl}
+                        </p>
+                        <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-top: 20px;">
+                            This link will expire in <strong>24 hours</strong>.
+                        </p>
+                        <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+                            If you didn't create an account, please ignore this email.
+                        </p>
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✓ Verification link sent to ${email}`);
+        return { success: true };
+    } catch (error) {
+        console.error(`✗ Failed to send verification link to ${email}:`, error.message);
+        return { success: false, error: error.message };
+    }
+};
+
+module.exports = {
+    generateOTP,
+    generateVerificationToken,
+    sendOTPEmail,
+    sendVerificationLinkEmail
+};

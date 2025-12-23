@@ -3,9 +3,28 @@ const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const db = require('../config/database');
 const { embedCV } = require('../services/embeddingService');
+const path = require('path');
+const fs = require('fs'); // 👇 Import fs
+
+// 👇 1. CẤU HÌNH LƯU FILE VÀO Ổ CỨNG
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        // Đảm bảo thư mục này tồn tại
+        const uploadDir = 'uploads/cvs/';
+        if (!fs.existsSync(uploadDir)){
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        // Tên file: timestamp-tên-gốc
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
 
 const upload = multer({ 
-    storage: multer.memoryStorage(),
+    storage: storage, // 👈 Sử dụng storage mới
     limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowedTypes = [
@@ -23,7 +42,9 @@ const upload = multer({
 
 // Helper to extract text from file
 const extractTextFromFile = async (file) => {
-    const { buffer, mimetype } = file;
+    // 👇 VÌ DÙNG DISK STORAGE, CẦN ĐỌC FILE TỪ ĐƯỜNG DẪN
+    const buffer = fs.readFileSync(file.path);
+    const { mimetype } = file;
     
     if (mimetype === 'text/plain') {
         return buffer.toString('utf-8');
@@ -46,6 +67,10 @@ const applyForJob = async (req, res) => {
 
         const candidate_id = req.user.id;
         const { job_id, cover_letter } = req.body;
+        
+        // 👇 LẤY ĐƯỜNG DẪN FILE ĐỂ LƯU DB
+        // Lưu ý: path.posix.join để đảm bảo dùng dấu / trên Windows
+        const filePath = `/uploads/cvs/${req.file.filename}`;
 
         if (!job_id) {
             return res.status(400).json({ error: 'Job ID is required' });
@@ -75,14 +100,14 @@ const applyForJob = async (req, res) => {
         // Generate embedding
         const cvVector = await embedCV(cvText);
 
-        // Save or update CV
+        // 👇 CẬP NHẬT QUERY: LƯU THÊM file_path
         const cvResult = await db.query(
-            `INSERT INTO cvs (candidate_id, filename, cv_text, vector) 
-             VALUES ($1, $2, $3, $4) 
+            `INSERT INTO cvs (candidate_id, filename, cv_text, vector, file_path) 
+             VALUES ($1, $2, $3, $4, $5) 
              ON CONFLICT (candidate_id) 
-             DO UPDATE SET filename = $2, cv_text = $3, vector = $4, created_at = CURRENT_TIMESTAMP
+             DO UPDATE SET filename = $2, cv_text = $3, vector = $4, file_path = $5, created_at = CURRENT_TIMESTAMP
              RETURNING id`,
-            [candidate_id, req.file.originalname, cvText, JSON.stringify(cvVector)]
+            [candidate_id, req.file.originalname, cvText, JSON.stringify(cvVector), filePath]
         );
 
         const cv_id = cvResult.rows[0].id;

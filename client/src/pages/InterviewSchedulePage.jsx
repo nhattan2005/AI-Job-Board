@@ -51,12 +51,14 @@ const InterviewSchedulePage = () => {
         setError(null);
 
         try {
-            await api.post('/interviews/confirm', { // ← ĐÚNG: Gọi confirm interview thật
+            await api.post('/interviews/confirm', {
                 interviewId: interview.id,
                 slotId: selectedSlotId
             });
 
             setSuccess(true);
+            
+            // 👇 ĐẢM BẢO DÒNG NÀY CHUYỂN VỀ /my-interviews
             setTimeout(() => {
                 navigate('/my-interviews');
             }, 2000);

@@ -5,7 +5,8 @@ const { embedJobDescription, saveJobEmbedding } = require('../services/embedding
 
 // Create a new job (Employer only)
 const createJob = async (req, res) => {
-    const { title, description, location, salary_range, employment_type } = req.body;
+    // 👇 THÊM deadline vào destructuring
+    const { title, description, location, salary_range, employment_type, deadline } = req.body;
     const employer_id = req.user.id; // From auth middleware
     
     try {
@@ -14,11 +15,12 @@ const createJob = async (req, res) => {
             return res.status(400).json({ error: 'Title and description are required' });
         }
 
+        // 👇 CẬP NHẬT QUERY INSERT
         const result = await db.query(
-            `INSERT INTO jobs (employer_id, title, description, location, salary_range, employment_type, status) 
-             VALUES ($1, $2, $3, $4, $5, $6, 'active') 
+            `INSERT INTO jobs (employer_id, title, description, location, salary_range, employment_type, deadline, status) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'active') 
              RETURNING *`, 
-            [employer_id, title, description, location || '', salary_range || '', employment_type || 'full-time']
+            [employer_id, title, description, location || '', salary_range || '', employment_type || 'full-time', deadline || null]
         );
         
         const job = result.rows[0];
@@ -31,26 +33,50 @@ const createJob = async (req, res) => {
             console.warn('Failed to generate embedding for job:', embeddingError);
         }
         
-        res.status(201).json({
-            message: 'Job created successfully',
-            job: job
-        });
+        res.status(201).json(job);
     } catch (error) {
         console.error('Error creating job:', error);
-        res.status(500).json({ error: 'Failed to create job', details: error.message });
+        res.status(500).json({ error: 'Failed to create job' });
+    }
+};
+
+// Create a new job
+const updateJob = async (req, res) => {
+    const { id } = req.params;
+    const { title, description, location, salary_range, employment_type, deadline, status } = req.body;
+    const employer_id = req.user.id;
+
+    try {
+        // Kiểm tra quyền sở hữu
+        const checkOwner = await db.query('SELECT id FROM jobs WHERE id = $1 AND employer_id = $2', [id, employer_id]);
+        if (checkOwner.rows.length === 0) {
+            return res.status(403).json({ error: 'Not authorized to edit this job' });
+        }
+
+        const result = await db.query(
+            `UPDATE jobs 
+             SET title = $1, description = $2, location = $3, salary_range = $4, employment_type = $5, deadline = $6, status = $7, updated_at = CURRENT_TIMESTAMP
+             WHERE id = $8
+             RETURNING *`,
+            [title, description, location, salary_range, employment_type, deadline, status, id]
+        );
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error updating job:', error);
+        res.status(500).json({ error: 'Failed to update job' });
     }
 };
 
 // Get all active jobs (Public)
 const getJobs = async (req, res) => {
     try {
-        // FIX: 
-        // 1. Dùng j.* để lấy toàn bộ cột của job (bao gồm salary_min, salary_max nếu có)
-        // 2. Lấy u.company_name và KHÔNG đổi tên thành 'company' để khớp với Frontend (job.company_name)
+        // 👇 SỬA QUERY: Thêm u.avatar_url
         const result = await db.query(`
             SELECT 
                 j.*, 
-                u.company_name
+                u.company_name,
+                u.avatar_url
             FROM jobs j
             LEFT JOIN users u ON j.employer_id = u.id
             WHERE j.status = 'active'
@@ -84,9 +110,13 @@ const getAllJobs = async (req, res) => {
 const getJobById = async (req, res) => {
     const { id } = req.params;
     try {
-        // FIX: Join với bảng users để lấy company_name cho trang chi tiết
+        // 👇 CẬP NHẬT QUERY: Thêm deadline và subquery đếm số lượng application
         const result = await db.query(`
-            SELECT j.*, u.company_name 
+            SELECT 
+                j.*, 
+                u.company_name, 
+                u.avatar_url,
+                (SELECT COUNT(*)::int FROM applications a WHERE a.job_id = j.id) as application_count
             FROM jobs j 
             JOIN users u ON j.employer_id = u.id 
             WHERE j.id = $1
@@ -145,7 +175,7 @@ const getJobApplications = async (req, res) => {
                 a.id, a.status, a.applied_at, a.match_score, a.ai_advice, a.cover_letter,
                 u.id as candidate_id, u.email as candidate_email, 
                 u.full_name as candidate_name, u.skills as candidate_skills,
-                c.cv_text, c.filename as cv_filename
+                c.cv_text, c.filename as cv_filename, c.file_path
             FROM applications a
             JOIN users u ON a.candidate_id = u.id
             JOIN cvs c ON a.cv_id = c.id
@@ -162,9 +192,10 @@ const getJobApplications = async (req, res) => {
 
 module.exports = {
     createJob,
+    updateJob, // 👈 Nhớ export hàm mới
     getJobs,
     getAllJobs,
     getJobById,
     getMyJobs,
-    getJobApplications  // Add this export
+    getJobApplications
 };

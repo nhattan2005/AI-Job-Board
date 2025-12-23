@@ -4,7 +4,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const ProfilePage = () => {
-    const { user, updateUser, isCandidate, isEmployer } = useAuth();
+    const { user, updateUser, isCandidate, isEmployer } = useAuth(); // Đảm bảo updateUser được lấy từ context
     const navigate = useNavigate();
 
     // Common fields
@@ -27,6 +27,7 @@ const ProfilePage = () => {
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState('');
     const [error, setError] = useState('');
+    const [avatarUrl, setAvatarUrl] = useState(''); // State cho avatar
 
     useEffect(() => {
         if (user) {
@@ -42,8 +43,45 @@ const ProfilePage = () => {
                 setCompanyDescription(user.company_description || '');
                 setWebsite(user.website || '');
             }
+
+            setAvatarUrl(user.avatar_url || ''); // Load avatar từ user context
         }
     }, [user, isCandidate, isEmployer]);
+
+    // 👇 HÀM XỬ LÝ UPLOAD ẢNH
+    const handleAvatarChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        try {
+            setLoading(true);
+            const response = await api.post('/auth/avatar', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            const newAvatarUrl = response.data.avatar_url;
+            setAvatarUrl(newAvatarUrl);
+            
+            // Cập nhật user trong context để các trang khác cũng thấy avatar mới
+            updateUser({ ...user, avatar_url: newAvatarUrl });
+            
+            setSuccess('Avatar updated successfully!');
+        } catch (err) {
+            console.error(err);
+            setError('Failed to upload avatar');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Helper để lấy full URL ảnh
+    const getFullImageUrl = (path) => {
+        if (!path) return null;
+        return `http://localhost:5000${path}`; // Thay đổi port nếu server chạy port khác
+    };
 
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
@@ -139,6 +177,37 @@ const ProfilePage = () => {
                     {error}
                 </div>
             )}
+
+            {/* 👇 THÊM ĐOẠN CODE NÀY VÀO ĐÂY (Ngay trước div chứa form Profile Information) */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6 flex items-center gap-6">
+                <div className="relative group">
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-100 bg-slate-200 flex items-center justify-center">
+                        {avatarUrl ? (
+                            <img 
+                                src={getFullImageUrl(avatarUrl)} 
+                                alt="Profile" 
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <span className="text-3xl text-slate-400 font-bold">
+                                {isEmployer ? companyName?.charAt(0) || 'C' : fullName?.charAt(0) || 'U'}
+                            </span>
+                        )}
+                    </div>
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 group-hover:opacity-100 rounded-full cursor-pointer transition-opacity">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                    </label>
+                </div>
+                <div>
+                    <h2 className="text-xl font-bold text-gray-800">Profile Picture</h2>
+                    <p className="text-sm text-gray-500">Click on the image to upload a new photo. JPG, PNG or GIF.</p>
+                </div>
+            </div>
+            {/* 👆 KẾT THÚC ĐOẠN CODE CẦN THÊM */}
 
             {/* Profile Information Form */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
