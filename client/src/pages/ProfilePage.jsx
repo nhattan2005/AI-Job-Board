@@ -80,7 +80,8 @@ const ProfilePage = () => {
     // Helper để lấy full URL ảnh
     const getFullImageUrl = (path) => {
         if (!path) return null;
-        return `http://localhost:5000${path}`; // Thay đổi port nếu server chạy port khác
+        if (path.startsWith('http')) return path; // Nếu là link Cloudinary thì giữ nguyên
+        return `http://localhost:5000${path}`; // Fallback cho ảnh cũ (nếu có)
     };
 
     const handleUpdateProfile = async (e) => {

@@ -63,14 +63,11 @@ const EmployerApplications = () => {
     };
 
     const downloadCV = (app) => {
-        // 1. Ưu tiên tải file gốc nếu có đường dẫn
         if (app.file_path) {
-            const fileUrl = `http://localhost:5000${app.file_path}`;
-            // Mở trong tab mới để trình duyệt tự xử lý (download hoặc view PDF)
-            window.open(fileUrl, '_blank');
+            // Nếu là link Cloudinary, mở trực tiếp
+            window.open(app.file_path, '_blank');
             return;
         }
-
         // 2. Fallback: Nếu là CV cũ chưa có file gốc, tải text file như trước
         if (!app.cv_text) {
             alert('No CV text available');
