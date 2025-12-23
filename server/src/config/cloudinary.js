@@ -8,23 +8,22 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Cấu hình storage cho Avatar (Lưu vào folder 'avatars')
+// Cấu hình storage cho Avatar
 const avatarStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'ai-job-board/avatars',
         allowed_formats: ['jpg', 'png', 'jpeg'],
-        transformation: [{ width: 500, height: 500, crop: 'limit' }] // Tự động resize
+        transformation: [{ width: 500, height: 500, crop: 'limit' }]
     }
 });
 
-// Cấu hình storage cho CV (Lưu vào folder 'cvs')
-// Lưu ý: Cloudinary hỗ trợ lưu PDF/Raw files
+// Cấu hình storage cho CV
 const cvStorage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
         folder: 'ai-job-board/cvs',
-        resource_type: 'raw', // Quan trọng cho PDF/DOCX
+        resource_type: 'raw',
         allowed_formats: ['pdf', 'doc', 'docx', 'txt']
     }
 });
