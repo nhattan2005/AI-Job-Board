@@ -24,6 +24,9 @@ import InterviewFeedback from './pages/InterviewFeedback'; // THÊM IMPORT
 import VerifyEmailPage from './pages/VerifyEmailPage'; // THÊM
 import EmailVerifiedPage from './pages/EmailVerifiedPage'; // THÊM
 import VerifyEmailSentPage from './pages/VerifyEmailSentPage';
+import AdminDashboard from './pages/AdminDashboard'; // 👈 THÊM
+import AdminUsers from './pages/AdminUsers'; // 👈 THÊM
+import AdminJobs from './pages/AdminJobs'; // 👈 THÊM
 
 const App = () => {
     return (
@@ -152,6 +155,47 @@ const App = () => {
                                     </ProtectedRoute>
                                 } 
                             />
+
+                            {/* Mock Interview Room & Feedback */}
+                            <Route path="/interview-room/:sessionId" element={
+                                <ProtectedRoute requiredRole="candidate">
+                                    <InterviewRoom />
+                                </ProtectedRoute>
+                            } />
+                            <Route path="/interview-feedback/:sessionId" element={
+                                <ProtectedRoute requiredRole="candidate">
+                                    <InterviewFeedback />
+                                </ProtectedRoute>
+                            } />
+
+                            {/* 👇 THÊM ADMIN ROUTES */}
+                            <Route 
+                                path="/admin/dashboard" 
+                                element={
+                                    <ProtectedRoute requiredRole="admin">
+                                        <AdminDashboard />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            <Route 
+                                path="/admin/users" 
+                                element={
+                                    <ProtectedRoute requiredRole="admin">
+                                        <AdminUsers />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            <Route 
+                                path="/admin/jobs" 
+                                element={
+                                    <ProtectedRoute requiredRole="admin">
+                                        <AdminJobs />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
+                            {/* 404 Page */}
+                            <Route path="*" element={<h1>404 Not Found</h1>} />
                         </Routes>
                     </main>
                 </div>

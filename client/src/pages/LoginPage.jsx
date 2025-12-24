@@ -23,7 +23,10 @@ const LoginPage = () => {
         try {
             const user = await login(email, password);
             
-            if (user.role === 'employer') {
+            // 👇 SỬA: Thêm check role admin
+            if (user.role === 'admin') {
+                navigate('/admin/dashboard');
+            } else if (user.role === 'employer') {
                 navigate('/employer/dashboard');
             } else {
                 navigate('/');
@@ -31,7 +34,6 @@ const LoginPage = () => {
         } catch (err) {
             const errorData = err.response?.data;
             
-            // XỬ LÝ EMAIL CHƯA XÁC THỰC
             if (errorData?.error === 'Email not verified') {
                 setUnverifiedEmail(errorData.email || email);
                 setShowResendVerification(true);

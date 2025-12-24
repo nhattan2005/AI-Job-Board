@@ -56,8 +56,17 @@ const verifyCandidate = (req, res, next) => {
     next();
 };
 
+// Middleware to verify admin role
+const verifyAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied. Admin role required.' });
+    }
+    next();
+};
+
 module.exports = {
     verifyToken,
     verifyEmployer,
-    verifyCandidate
+    verifyCandidate,
+    verifyAdmin
 };

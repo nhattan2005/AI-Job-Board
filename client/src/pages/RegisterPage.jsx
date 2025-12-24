@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 
 const RegisterPage = () => {
     const navigate = useNavigate();
+    const { register } = useAuth();
 
     const [role, setRole] = useState('candidate');
     const [email, setEmail] = useState('');
@@ -24,8 +26,18 @@ const RegisterPage = () => {
     const [loading, setLoading] = useState(false);
     const [verificationType, setVerificationType] = useState('otp');
 
+    // 👇 THÊM: Prevent multiple submissions
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // 👇 THÊM: Check if already submitting
+        if (isSubmitting) {
+            console.log('⚠️ Already submitting, ignoring duplicate request');
+            return;
+        }
+
         setError('');
 
         if (password !== confirmPassword) {
@@ -58,17 +70,13 @@ const RegisterPage = () => {
             return;
         }
 
+        // 👇 SET FLAGS
         setLoading(true);
+        setIsSubmitting(true);
 
         try {
-            const userData = {
-                email,
-                password,
-                role,
-                phone,
-                verificationType
-            };
-
+            const userData = { email, password, role, phone, verificationType };
+            
             if (role === 'candidate') {
                 userData.full_name = fullName;
                 userData.bio = bio;
@@ -79,7 +87,22 @@ const RegisterPage = () => {
                 userData.website = website;
             }
 
-            await api.post('/auth/register', userData);
+            console.log('📤 Sending registration data:', userData);
+
+            const result = await register(userData);
+            
+            console.log('✅ Registration result:', result);
+            
+            if (result.skipVerification) {
+                if (result.user.role === 'employer') {
+                    navigate('/employer/dashboard');
+                } else if (result.user.role === 'admin') {
+                    navigate('/admin/dashboard');
+                } else {
+                    navigate('/');
+                }
+                return;
+            }
             
             if (verificationType === 'otp') {
                 navigate('/verify-email', { 
@@ -97,9 +120,14 @@ const RegisterPage = () => {
                 });
             }
         } catch (err) {
+            console.error('❌ Registration error:', err);
             setError(err.response?.data?.error || 'Registration failed. Please try again.');
         } finally {
             setLoading(false);
+            // 👇 THÊM: Reset after 2 seconds để tránh spam
+            setTimeout(() => {
+                setIsSubmitting(false);
+            }, 2000);
         }
     };
 

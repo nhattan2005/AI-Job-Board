@@ -71,7 +71,7 @@ const updateJob = async (req, res) => {
 // Get all active jobs (Public)
 const getJobs = async (req, res) => {
     try {
-        // 👇 SỬA QUERY: Thêm u.avatar_url
+        // 👇 THÊM ĐIỀU KIỆN: Không hiển thị job bị hidden
         const result = await db.query(`
             SELECT 
                 j.*, 
@@ -79,7 +79,7 @@ const getJobs = async (req, res) => {
                 u.avatar_url
             FROM jobs j
             LEFT JOIN users u ON j.employer_id = u.id
-            WHERE j.status = 'active'
+            WHERE j.status = 'active' AND j.is_hidden = FALSE
             ORDER BY j.created_at DESC
         `);
         res.status(200).json(result.rows);

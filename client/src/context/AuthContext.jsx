@@ -48,16 +48,27 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (userData) => {
         try {
-            const response = await api.post('/auth/register', userData); // ← ĐÃ SỬA
+            console.log('📤 Sending registration request:', userData);
+            
+            const response = await api.post('/auth/register', userData);
+            
+            console.log('✅ Registration response:', response.data);
+            
             const { token, user } = response.data;
             
-            localStorage.setItem('token', token);
-            axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            // Check if user already verified (admin/test account)
+            if (user.email_verified && token) {
+                localStorage.setItem('token', token);
+                axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                setUser(user);
+                return { user, skipVerification: true };
+            }
             
-            setUser(user);
-            
-            return user;
+            return { user, skipVerification: false };
         } catch (error) {
+            console.error('❌ Register error:', error);
+            console.error('❌ Error response:', error.response?.data);
+            console.error('❌ Error status:', error.response?.status);
             throw error;
         }
     };
@@ -75,17 +86,18 @@ export const AuthProvider = ({ children }) => {
     const isAuthenticated = !!user;
     const isEmployer = user?.role === 'employer';
     const isCandidate = user?.role === 'candidate';
+    const isAdmin = user?.role === 'admin'; // 👈 THÊM DÒNG NÀY
 
     const value = {
         user,
-        loading,
         login,
         register,
         logout,
         updateUser,
         isAuthenticated,
+        isEmployer,
         isCandidate,
-        isEmployer
+        isAdmin // 👈 THÊM VÀO VALUE
     };
 
     return (

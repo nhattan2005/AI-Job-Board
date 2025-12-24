@@ -6,16 +6,25 @@ const { generateOTP, generateVerificationToken, sendOTPEmail, sendVerificationLi
 // Register new user
 const register = async (req, res) => {
     try {
+        // 👇 THÊM LOG ĐẦU HÀM
+        console.log('\n========== NEW REGISTRATION REQUEST ==========');
+        console.log('📥 Timestamp:', new Date().toISOString());
+        console.log('📥 Body:', req.body);
+        
         const { email, password, role, phone, verificationType } = req.body;
 
         // Validate required fields
         if (!email || !password || !role || !phone) {
+            console.error('❌ Validation failed: Missing required fields');
             return res.status(400).json({ error: 'Email, password, role, and phone are required' });
         }
 
         if (role !== 'candidate' && role !== 'employer') {
+            console.error('❌ Validation failed: Invalid role:', role);
             return res.status(400).json({ error: 'Invalid role. Must be candidate or employer' });
         }
+
+        console.log('✅ Validation passed');
 
         // Check if user already exists
         const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -70,30 +79,66 @@ const register = async (req, res) => {
             );
         }
 
-        const user = result.rows[0];
+        const newUser = result.rows[0];
+        console.log('✅ User created:', newUser.email, 'ID:', newUser.id);
 
-        // Send verification email
-        let emailResult;
-        if (useOTP) {
-            emailResult = await sendOTPEmail(email, verificationData.token);
+        const SKIP_EMAIL_FOR_TESTING = false;
+
+        if (!SKIP_EMAIL_FOR_TESTING) {
+            const useOTP = verificationType === 'otp';
+
+            console.log('📧 Sending email...');
+            console.log('   Type:', useOTP ? 'OTP' : 'Link');
+            console.log('   To:', email);
+
+            let emailResult;
+            if (useOTP) {
+                emailResult = await sendOTPEmail(email, verificationData.token);
+            } else {
+                emailResult = await sendVerificationLinkEmail(email, verificationData.token);
+            }
+
+            console.log('📧 Email result:', emailResult);
+
+            if (!emailResult.success) {
+                console.error('❌ Email send failed:', emailResult.error);
+                return res.status(500).json({ 
+                    error: 'Failed to send verification email',
+                    details: emailResult.error 
+                });
+            }
+
+            console.log(`✅ ${useOTP ? 'OTP' : 'Link'} sent to ${email}`);
         } else {
-            emailResult = await sendVerificationLinkEmail(email, verificationData.token);
+            console.log('⚠️  SKIP_EMAIL_FOR_TESTING is ON');
         }
 
-        if (!emailResult.success) {
-            await db.query('DELETE FROM users WHERE id = $1', [user.id]);
-            return res.status(500).json({ error: 'Failed to send verification email. Please try again.' });
-        }
+        const token = jwt.sign(
+            { userId: newUser.id, role: newUser.role },
+            process.env.JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        console.log('✅ Token generated for user:', newUser.id);
 
         res.status(201).json({
-            message: 'Registration successful. Please check your email to verify your account.',
-            userId: user.id,
-            email: user.email,
-            verificationType: useOTP ? 'otp' : 'link'
+            message: 'Registration successful',
+            token,
+            user: {
+                id: newUser.id,
+                email: newUser.email,
+                role: newUser.role,
+                email_verified: newUser.email_verified
+            }
         });
+
+        console.log('✅ Response sent successfully');
+        console.log('========== END REQUEST ==========\n');
+
     } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ error: 'Failed to register user' });
+        console.error('❌ Registration error:', error);
+        console.error('Error stack:', error.stack);
+        res.status(500).json({ error: 'Registration failed' });
     }
 };
 
@@ -258,7 +303,7 @@ const resendVerification = async (req, res) => {
     }
 };
 
-// Login user - Updated
+// Login user
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -268,44 +313,46 @@ const login = async (req, res) => {
         }
 
         const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-        
+
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+            return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         const user = result.rows[0];
 
-        if (!user.email_verified) {
+        // 👇 THÊM ĐOẠN NÀY
+        // Check if user is banned
+        if (user.is_banned) {
             return res.status(403).json({ 
-                error: 'Email not verified', 
-                message: 'Please verify your email before logging in',
-                email: user.email
+                error: 'Account suspended', 
+                details: user.ban_reason || 'Your account has been suspended by administrators.'
             });
         }
 
-        const isValid = await bcrypt.compare(password, user.password_hash);
-        
-        if (!isValid) {
-            return res.status(401).json({ error: 'Invalid email or password' });
+        // Check email verification
+        if (!user.email_verified) {
+            return res.status(403).json({ error: 'Please verify your email before logging in' });
         }
 
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+        if (!passwordMatch) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        // 👇 SỬA: Đổi 'id' thành 'userId'
         const token = jwt.sign(
-            { userId: user.id, email: user.email, role: user.role },
+            { userId: user.id, email: user.email, role: user.role }, // ← SỬA ĐÂY
             process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+            { expiresIn: '7d' }
         );
 
-        delete user.password_hash;
-        delete user.verification_token;
+        const { password_hash, verification_token, verification_token_expires, ...userWithoutPassword } = user;
 
-        res.json({
-            message: 'Login successful',
-            token,
-            user
-        });
+        res.json({ token, user: userWithoutPassword });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Failed to login' });
+        res.status(500).json({ error: 'Login failed' });
     }
 };
 

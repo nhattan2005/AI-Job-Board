@@ -13,6 +13,7 @@ const employerRoutes = require('./routes/employerRoutes');
 const employerEmailRoutes = require('./routes/employerEmailRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
 const mockInterviewRoutes = require('./routes/mockInterviewRoutes');
+const adminRoutes = require('./routes/adminRoutes'); // 👈 THÊM DÒNG NÀY
 const errorHandler = require('./middleware/errorHandler');
 const db = require('./config/database');
 
@@ -47,10 +48,11 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/cv', cvRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/employer', employerRoutes);
-app.use('/api/employer', employerEmailRoutes); // 👈 THÊM DÒNG NÀY
+app.use('/api/employer', employerEmailRoutes);
 app.use('/api/interviews', interviewRoutes);
 app.use('/api/career', careerRoutes);
 app.use('/api/mock-interview', mockInterviewRoutes);
+app.use('/api/admin', adminRoutes); // 👈 THÊM DÒNG NÀY
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

@@ -21,12 +21,12 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create ENUM for user roles
-CREATE TYPE user_role AS ENUM ('candidate', 'employer');
+CREATE TYPE user_role AS ENUM ('candidate', 'employer', 'admin');
 
 -- Create Enum for Interview Type
 CREATE TYPE interview_type AS ENUM ('HR', 'Tech_Lead');
 
--- Create users table with role-based fields
+-- Create users table with role-based 
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -61,11 +61,13 @@ CREATE TABLE users (
     -- Constraints to ensure role-specific fields are set correctly
     CONSTRAINT candidate_fields_check CHECK (
         (role = 'candidate' AND full_name IS NOT NULL) OR 
-        (role = 'employer')
+        (role = 'employer') OR 
+        (role = 'admin')
     ),
     CONSTRAINT employer_fields_check CHECK (
         (role = 'employer' AND company_name IS NOT NULL) OR 
-        (role = 'candidate')
+        (role = 'candidate') OR 
+        (role = 'admin')
     )
 );
 
@@ -186,20 +188,43 @@ CREATE TABLE mock_interviews (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for better performance
-CREATE INDEX idx_mock_interviews_user ON mock_interviews(user_id);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_jobs_employer ON jobs(employer_id);
-CREATE INDEX idx_jobs_status ON jobs(status);
-CREATE INDEX idx_applications_job ON applications(job_id);
-CREATE INDEX idx_applications_candidate ON applications(candidate_id);
-CREATE INDEX idx_applications_status ON applications(status);
-CREATE INDEX idx_cvs_candidate ON cvs(candidate_id);
-CREATE INDEX idx_interviews_application ON interviews(application_id);
-CREATE INDEX idx_interviews_status ON interviews(status);
-CREATE INDEX idx_interviews_date ON interviews(interview_date);
-CREATE INDEX idx_time_slots_interview ON interview_time_slots(interview_id);
+-- ============================================
+-- ADMIN FEATURES: Tables & Columns
+-- ============================================
+
+-- Bảng log hành động của admin
+CREATE TABLE IF NOT EXISTS admin_actions (
+    id SERIAL PRIMARY KEY,
+    admin_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    action_type VARCHAR(50) NOT NULL, -- 'hide_job', 'activate_job', 'ban_user', 'unban_user'
+    target_type VARCHAR(50) NOT NULL, -- 'job', 'user'
+    target_id INTEGER NOT NULL,
+    reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Thêm cột ban cho users
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_by INTEGER REFERENCES users(id);
+
+-- Thêm cột hidden cho jobs
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT FALSE;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS hidden_reason TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMP;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS hidden_by INTEGER REFERENCES users(id);
+
+-- Index để tăng tốc query
+CREATE INDEX IF NOT EXISTS idx_users_is_banned ON users(is_banned);
+CREATE INDEX IF NOT EXISTS idx_jobs_is_hidden ON jobs(is_hidden);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_admin ON admin_actions(admin_id);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_created ON admin_actions(created_at DESC);
+
+-- Comment
+COMMENT ON TABLE admin_actions IS 'Log all admin actions for auditing';
+COMMENT ON COLUMN users.is_banned IS 'Whether user account is banned by admin';
+COMMENT ON COLUMN jobs.is_hidden IS 'Whether job is hidden by admin';
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -239,6 +264,11 @@ ON CONFLICT (email) DO NOTHING;
 INSERT INTO users (email, password_hash, role, full_name, bio, skills) VALUES
 ('candidate1@example.com', '$2a$10$XqJz5KqHKJ5KqHKJ5KqHKuYP2h8fH8fH8fH8fH8fH8fH8fH8fH8fH', 'candidate', 'John Doe', 'Full-stack developer with 5 years experience', ARRAY['JavaScript', 'React', 'Node.js', 'PostgreSQL']),
 ('candidate2@example.com', '$2a$10$XqJz5KqHKJ5KqHKJ5KqHKuYP2h8fH8fH8fH8fH8fH8fH8fH8fH8fH', 'candidate', 'Jane Smith', 'Senior frontend developer passionate about UX', ARRAY['React', 'Vue', 'TypeScript', 'CSS', 'Figma'])
+ON CONFLICT (email) DO NOTHING;
+
+-- Sample Admin
+INSERT INTO users (email, password_hash, role, full_name) VALUES
+('admin@test.com', '$2b$10$BK8x9d8YF7AW6Xx/s7.XG.TQdqcEufU5e1U52uYTzC/bEbWe9B492', 'admin', 'Super Admin')
 ON CONFLICT (email) DO NOTHING;
 
 -- Sample Jobs
@@ -281,6 +311,13 @@ INSERT INTO mock_interviews (user_id, job_id, interview_type, chat_history, audi
 (2, 2, 'Tech_Lead', '[{"role": "user", "text": "What is your experience with React?", "timestamp": "2024-12-02T14:00:00Z"}, {"role": "model", "text": "I have 4 years of experience...", "timestamp": "2024-12-02T14:00:05Z"}]', '{"hesitation_count": 1, "wpm_avg": 160, "total_duration": 90}', 85, 'Strong React knowledge, good problem-solving skills.', 'active')
 ON CONFLICT (session_id) DO NOTHING;
 
+-- Đánh dấu tài khoản admin đã verified
+UPDATE users 
+SET email_verified = TRUE, 
+    verification_token = NULL, 
+    verification_token_expires = NULL
+WHERE email = 'admin@test.com';
+
 -- Success message
 DO $$ 
 BEGIN 
@@ -289,5 +326,6 @@ BEGIN
     RAISE NOTICE '👤 Test accounts:';
     RAISE NOTICE '   Employer: employer1@example.com / password123';
     RAISE NOTICE '   Candidate: candidate1@example.com / password123';
+    RAISE NOTICE '   Admin: admin@test.com / password123';
     RAISE NOTICE '🔐 Email verification fields added to users table';
 END $$;

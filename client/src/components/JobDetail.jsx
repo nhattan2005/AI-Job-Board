@@ -446,7 +446,7 @@ const JobDetail = () => {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <button
-                                        onClick={() => navigate(`/interview/${id}/HR`)}
+                                        onClick={() => navigate(`/ai-interview/${id}/HR`)}
                                         className="group relative flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all hover:scale-[1.02]"
                                     >
                                         <div className="flex items-center gap-3">
@@ -462,7 +462,7 @@ const JobDetail = () => {
                                     </button>
 
                                     <button
-                                        onClick={() => navigate(`/interview/${id}/Tech_Lead`)}
+                                        onClick={() => navigate(`/ai-interview/${id}/Tech_Lead`)}
                                         className="group relative flex items-center justify-between p-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl transition-all hover:scale-[1.02]"
                                     >
                                         <div className="flex items-center gap-3">
