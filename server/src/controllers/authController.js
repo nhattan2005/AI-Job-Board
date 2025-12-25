@@ -361,8 +361,15 @@ const getProfile = async (req, res) => {
     try {
         const userId = req.user.id;
 
+        // 👇 THÊM avatar_url vào SELECT
         const result = await db.query(
-            'SELECT id, email, role, full_name, bio, skills, company_name, company_description, website, phone, created_at FROM users WHERE id = $1',
+            `SELECT 
+                id, email, role, full_name, bio, skills, 
+                company_name, company_description, website, phone, 
+                avatar_url, 
+                created_at 
+            FROM users 
+            WHERE id = $1`,
             [userId]
         );
 
@@ -467,11 +474,14 @@ const uploadAvatar = async (req, res) => {
 
         const userId = req.user.id;
         
-        // 👇 QUAN TRỌNG: Cloudinary trả về URL trong req.file.path
+        // 👇 CLOUDINARY TRẢ VỀ URL TRONG req.file.path
         const avatarUrl = req.file.path; 
 
+        console.log('✅ Avatar uploaded to Cloudinary:', avatarUrl);
+
+        // Lưu URL vào database
         const result = await db.query(
-            'UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING avatar_url',
+            'UPDATE users SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING avatar_url',
             [avatarUrl, userId]
         );
 
@@ -480,7 +490,7 @@ const uploadAvatar = async (req, res) => {
             avatar_url: result.rows[0].avatar_url 
         });
     } catch (error) {
-        console.error('Upload avatar error:', error);
+        console.error('❌ Upload avatar error:', error);
         res.status(500).json({ error: 'Failed to upload avatar' });
     }
 };

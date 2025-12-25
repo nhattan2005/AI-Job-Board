@@ -200,14 +200,20 @@ const JobList = () => {
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-xl font-bold text-slate-600 border border-slate-200 overflow-hidden">
                                 {job.avatar_url ? (
                                     <img 
-                                        src={getImageUrl(job.avatar_url)} 
+                                        src={job.avatar_url} 
                                         alt={job.company_name} 
                                         className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                            // Fallback nếu ảnh lỗi
+                                            e.target.style.display = 'none';
+                                            e.target.parentElement.innerHTML = job.company_name?.charAt(0) || 'C';
+                                        }}
                                     />
                                 ) : (
                                     job.company_name?.charAt(0) || 'C'
                                 )}
                             </div>
+                            
                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-700 border border-primary-100">
                                 {job.employment_type || 'Full-time'}
                             </span>

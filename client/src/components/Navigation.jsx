@@ -89,8 +89,23 @@ const Navigation = () => {
                                 
                                 <div className="flex items-center gap-3 ml-2">
                                     <Link to="/profile" className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-primary-600 transition">
-                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-primary-600 font-bold border border-slate-200">
-                                            {user?.full_name?.[0] || user?.company_name?.[0] || 'U'}
+                                        {/* 👇 SỬA: Thay thế avatar giả bằng ảnh thật */}
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-primary-600 font-bold border border-slate-200 overflow-hidden">
+                                            {user?.avatar_url ? (
+                                                <img 
+                                                    src={user.avatar_url} 
+                                                    alt={user?.full_name || user?.company_name || 'User'} 
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        // Fallback nếu ảnh lỗi
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <span style={{ display: user?.avatar_url ? 'none' : 'flex' }} className="w-full h-full flex items-center justify-center">
+                                                {user?.full_name?.[0] || user?.company_name?.[0] || 'U'}
+                                            </span>
                                         </div>
                                     </Link>
                                     <button onClick={handleLogout} className="text-sm font-medium text-slate-500 hover:text-red-600 transition">

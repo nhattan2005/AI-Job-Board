@@ -53,25 +53,43 @@ const ProfilePage = () => {
         const file = e.target.files[0];
         if (!file) return;
 
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            setError('File size must be less than 5MB');
+            return;
+        }
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            setError('Please upload an image file');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('avatar', file);
 
         try {
             setLoading(true);
+            setError('');
+            console.log('📤 Uploading avatar...');
+            
             const response = await api.post('/auth/avatar', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
             const newAvatarUrl = response.data.avatar_url;
+            console.log('✅ Avatar uploaded:', newAvatarUrl);
+            
             setAvatarUrl(newAvatarUrl);
             
-            // Cập nhật user trong context để các trang khác cũng thấy avatar mới
-            updateUser({ ...user, avatar_url: newAvatarUrl });
+            // 👇 THÊM: Fetch lại profile để update user object trong context
+            const profileResponse = await api.get('/auth/profile');
+            updateUser(profileResponse.data.user);
             
             setSuccess('Avatar updated successfully!');
         } catch (err) {
-            console.error(err);
-            setError('Failed to upload avatar');
+            console.error('❌ Upload error:', err);
+            setError(err.response?.data?.error || 'Failed to upload avatar');
         } finally {
             setLoading(false);
         }

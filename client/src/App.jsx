@@ -17,42 +17,50 @@ import AllApplications from './pages/AllApplications';
 import MyApplications from './pages/MyApplications';
 import InterviewSchedulePage from './pages/InterviewSchedulePage';
 import MyInterviews from './pages/MyInterviews';
-import CareerPath from './pages/CareerPath'; // <-- Đảm bảo dòng này tồn tại
-import ProfilePage from './pages/ProfilePage'; // <-- Đảm bảo dòng này tồn tại
-import MyCareerRoadmap from './pages/MyCareerRoadmap'; // Import trang mới
-import InterviewRoom from './pages/InterviewRoom'; // Import trang mới
-import InterviewFeedback from './pages/InterviewFeedback'; // THÊM IMPORT
-import VerifyEmailPage from './pages/VerifyEmailPage'; // THÊM
-import EmailVerifiedPage from './pages/EmailVerifiedPage'; // THÊM
+import CareerPath from './pages/CareerPath'; // 👈 QUAN TRỌNG
+import ProfilePage from './pages/ProfilePage';
+import MyCareerRoadmap from './pages/MyCareerRoadmap';
+import InterviewRoom from './pages/InterviewRoom';
+import InterviewFeedback from './pages/InterviewFeedback';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import EmailVerifiedPage from './pages/EmailVerifiedPage';
 import VerifyEmailSentPage from './pages/VerifyEmailSentPage';
-import AdminDashboard from './pages/AdminDashboard'; // 👈 THÊM
-import AdminUsers from './pages/AdminUsers'; // 👈 THÊM
-import AdminJobs from './pages/AdminJobs'; // 👈 THÊM
-import PrivacyPage from './pages/PrivacyPage'; // THÊM
+import AdminDashboard from './pages/AdminDashboard';
+import AdminUsers from './pages/AdminUsers';
+import AdminJobs from './pages/AdminJobs';
+import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 
 const App = () => {
     return (
         <Router>
             <AuthProvider>
-                <div className="min-h-screen bg-slate-50 flex flex-col"> {/* Đổi bg-gray-50 thành bg-slate-50 cho đẹp */}
+                <div className="min-h-screen bg-slate-50 flex flex-col">
                     <Navigation />
-                    <main className="container mx-auto p-6 flex-grow">
+                    <main className="flex-grow pt-16">
                         <Routes>
                             {/* Public Routes */}
                             <Route path="/" element={<JobList />} />
-                            <Route path="/jobs/:id" element={<JobDetail />} />
                             <Route path="/login" element={<LoginPage />} />
                             <Route path="/register" element={<RegisterPage />} />
-                            
-                            {/* Email Verification Routes */}
+                            <Route path="/jobs/:id" element={<JobDetail />} />
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
                             <Route path="/verify-email-sent" element={<VerifyEmailSentPage />} />
-                            <Route path="/verify-email/:token" element={<EmailVerifiedPage />} />
+                            <Route path="/email-verified" element={<EmailVerifiedPage />} />
 
-                            {/* 👇 1. THÊM ROUTE CHO CANDIDATE SCHEDULE (QUAN TRỌNG) */}
+                            {/* 👇 THÊM ROUTE NÀY - QUAN TRỌNG! */}
                             <Route 
-                                path="/interview/schedule/:applicationId" 
+                                path="/career-path" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <CareerPath />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
+                            {/* AI Interview Routes */}
+                            <Route 
+                                path="/interview/:jobId/:interviewType" 
                                 element={
                                     <ProtectedRoute requiredRole="candidate">
                                         <InterviewSchedulePage />
@@ -60,7 +68,6 @@ const App = () => {
                                 } 
                             />
 
-                            {/* 👇 2. SỬA ROUTE AI INTERVIEW: Đổi từ /interview/... thành /ai-interview/... */}
                             <Route 
                                 path="/ai-interview/:jobId/:type" 
                                 element={
@@ -125,7 +132,6 @@ const App = () => {
                                     </ProtectedRoute>
                                 } 
                             />
-                            {/* 👇 THÊM ROUTE NÀY */}
                             <Route 
                                 path="/employer/edit-job/:id" 
                                 element={
@@ -150,28 +156,8 @@ const App = () => {
                                     </ProtectedRoute>
                                 } 
                             />
-                            <Route 
-                                path="/employer/jobs/:jobId/applications/:applicationId/schedule-interview" 
-                                element={
-                                    <ProtectedRoute requiredRole="employer">
-                                        <InterviewSchedulePage />
-                                    </ProtectedRoute>
-                                } 
-                            />
 
-                            {/* Mock Interview Room & Feedback */}
-                            <Route path="/interview-room/:sessionId" element={
-                                <ProtectedRoute requiredRole="candidate">
-                                    <InterviewRoom />
-                                </ProtectedRoute>
-                            } />
-                            <Route path="/interview-feedback/:sessionId" element={
-                                <ProtectedRoute requiredRole="candidate">
-                                    <InterviewFeedback />
-                                </ProtectedRoute>
-                            } />
-
-                            {/* 👇 THÊM ADMIN ROUTES */}
+                            {/* Admin Routes */}
                             <Route 
                                 path="/admin/dashboard" 
                                 element={
@@ -197,7 +183,6 @@ const App = () => {
                                 } 
                             />
 
-                            {/* THÊM ROUTE CHO TRANG QUYỀN RIÊNG TƯ */}
                             <Route path="/privacy-policy" element={<PrivacyPage />} />
                             <Route path="/terms-of-service" element={<TermsPage />} />
 

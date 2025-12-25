@@ -58,7 +58,7 @@ const SuggestionAccordion = ({ suggestion, index }) => {
 };
 
 const JobDetail = () => {
-    const navigate = useNavigate(); // Hook điều hướng
+    const navigate = useNavigate();
     const { id } = useParams();
     const { isAuthenticated, isCandidate } = useAuth();
     const [job, setJob] = useState(null);
@@ -74,7 +74,25 @@ const JobDetail = () => {
     // AI features state
     const [matchScore, setMatchScore] = useState(null);
     const [aiSuggestions, setAiSuggestions] = useState(null);
-    const [analyzing, setAnalyzing] = useState(false); // Unified loading state
+    const [analyzing, setAnalyzing] = useState(false);
+
+    // 👇 THÊM HÀM formatSalary Ở ĐÂY
+    const formatSalary = (job) => {
+        // 1. Ưu tiên hiển thị salary_range (chuỗi) nếu có
+        if (job.salary_range) return job.salary_range;
+        
+        // 2. Fallback sang logic min/max (nếu có)
+        const min = job.salary_min;
+        const max = job.salary_max;
+
+        if ((!min && !max) || (min === 0 && max === 0)) return "Negotiable";
+        
+        const format = (n) => n?.toLocaleString('en-US');
+        
+        if (min && (!max || max === 0)) return `From $${format(min)}`;
+        if ((!min || min === 0) && max) return `Up to $${format(max)}`;
+        return `$${format(min)} - $${format(max)}`;
+    };
 
     useEffect(() => {
         const fetchJobData = async () => {
@@ -197,25 +215,8 @@ const JobDetail = () => {
         return 'text-red-600';
     };
 
-    // SỬA LẠI HÀM NÀY (nằm bên trong component JobDetail, trước return)
-    const formatSalary = (job) => {
-        if (job.salary_range) return job.salary_range;
-
-        const min = job.salary_min;
-        const max = job.salary_max;
-
-        if (!min && !max) return "Negotiable";
-        if (min === 0 && max === 0) return "Negotiable";
-        
-        const format = (n) => n?.toLocaleString('en-US');
-        
-        if (min && (!max || max === 0)) return `From $${format(min)}`;
-        if ((!min || min === 0) && max) return `Up to $${format(max)}`;
-        return `$${format(min)} - $${format(max)}`;
-    };
-
-    // Helper lấy URL ảnh
-    const getImageUrl = (path) => path ? `http://localhost:5000${path}` : null;
+    // 👇 XÓA HÀM NÀY (vì avatar_url đã là link Cloudinary đầy đủ)
+    // const getImageUrl = (path) => path ? `http://localhost:5000${path}` : null;
 
     // Helper để kiểm tra deadline
     const isExpired = job?.deadline && new Date(job.deadline) < new Date();
@@ -241,17 +242,25 @@ const JobDetail = () => {
                             <div>
                                 <h1 className="text-3xl font-bold text-slate-900 mb-2">{job.title}</h1>
                                 <div className="flex items-center gap-3">
-                                    {/* 👇 THÊM AVATAR VÀO ĐÂY */}
+                                    {/* 👇 SỬA: Dùng avatar_url trực tiếp */}
                                     <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
                                         {job.avatar_url ? (
                                             <img 
-                                                src={getImageUrl(job.avatar_url)} 
+                                                src={job.avatar_url} 
                                                 alt={job.company_name} 
                                                 className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                }}
                                             />
-                                        ) : (
-                                            <span className="font-bold text-slate-500">{job.company_name?.charAt(0)}</span>
-                                        )}
+                                        ) : null}
+                                        <span 
+                                            style={{ display: job.avatar_url ? 'none' : 'flex' }}
+                                            className="w-full h-full flex items-center justify-center font-bold text-slate-500"
+                                        >
+                                            {job.company_name?.charAt(0)}
+                                        </span>
                                     </div>
                                     
                                     <div className="flex items-center gap-2 text-lg font-medium text-slate-600">

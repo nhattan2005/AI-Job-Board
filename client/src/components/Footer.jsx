@@ -74,36 +74,24 @@ const Footer = () => {
                             </div>
                         </div>
 
-                        {/* About Us - NAVIGATION LINKS */}
+                        {/* About Project */}
                         <div>
-                            <h3 className="text-lg font-bold mb-4">About Us</h3>
-                            <ul className="space-y-2">
-                                <li>
-                                    <Link to="/" className="text-slate-400 hover:text-primary-400 transition text-sm">
-                                        Browse Jobs
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link to="/my-applications" className="text-slate-400 hover:text-primary-400 transition text-sm">
-                                        My Applications
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link to="/my-interviews" className="text-slate-400 hover:text-primary-400 transition text-sm">
-                                        My Interviews
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link to="/my-roadmap" className="text-slate-400 hover:text-primary-400 transition text-sm">
-                                        My Roadmap
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link to="/profile" className="text-slate-400 hover:text-primary-400 transition text-sm">
-                                        Profile
-                                    </Link>
-                                </li>
-                            </ul>
+                            <h3 className="text-lg font-bold mb-4">About Project</h3>
+                            
+                            <div className="space-y-3">
+                                <p className="text-white text-lg font-bold leading-relaxed">
+                                    Đồ án môn học
+                                </p>
+                                <p className="text-slate-300 text-base leading-relaxed">
+                                    Nhập môn Công nghệ phần mềm
+                                </p>
+                                <p className="text-primary-400 text-base font-bold">
+                                    SE104.Q11.KHTN
+                                </p>
+                                <p className="text-slate-400 text-sm leading-relaxed mt-2">
+                                    Trường Đại học Công nghệ thông tin - ĐHQG TP.HCM
+                                </p>
+                            </div>
                         </div>
 
                         {/* AI Features */}

@@ -1,7 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-// 👇 Thay đổi import
-const { avatarStorage } = require('../config/cloudinary'); 
+const { avatarStorage } = require('../config/cloudinary'); // 👈 IMPORT
 const { register, login, getProfile, updateProfile, uploadAvatar, changePassword, verifyEmailOTP, verifyEmailLink, resendVerification } = require('../controllers/authController');
 const { verifyToken } = require('../middleware/authMiddleware');
 
@@ -21,7 +20,8 @@ router.post('/login', login);
 router.get('/profile', verifyToken, getProfile);
 router.patch('/profile', verifyToken, updateProfile);
 router.patch('/change-password', verifyToken, changePassword);
-// 👇 THÊM ROUTE UPLOAD AVATAR
+
+// 👇 ROUTE UPLOAD AVATAR
 router.post('/avatar', verifyToken, upload.single('avatar'), uploadAvatar);
 
 module.exports = router;

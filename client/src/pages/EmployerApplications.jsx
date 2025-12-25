@@ -62,26 +62,36 @@ const EmployerApplications = () => {
         setIsInterviewModalOpen(true);
     };
 
-    const downloadCV = (app) => {
-        if (app.file_path) {
-            // Nếu là link Cloudinary, mở trực tiếp
-            window.open(app.file_path, '_blank');
-            return;
+    const downloadCV = async (app) => {
+        try {
+            // 👇 SỬA: Dùng api service để gửi kèm token
+            const response = await api.get(`/applications/${app.id}/download-cv`, {
+                responseType: 'blob' // Quan trọng: Nhận file dưới dạng blob
+            });
+
+            // Tạo URL từ blob
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            
+            // Lấy extension từ filename
+            const extension = app.cv_filename 
+                ? app.cv_filename.split('.').pop().toLowerCase() 
+                : 'pdf';
+            
+            // Tạo link download
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${app.candidate_name}_CV.${extension}`;
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+        } catch (error) {
+            console.error('Download error:', error);
+            alert('Failed to download CV. Please try again.');
         }
-        // 2. Fallback: Nếu là CV cũ chưa có file gốc, tải text file như trước
-        if (!app.cv_text) {
-            alert('No CV text available');
-            return;
-        }
-        const blob = new Blob([app.cv_text], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${app.candidate_name || 'candidate'}_CV_${app.cv_filename || 'cv.txt'}`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
     };
 
     const toggleExpand = (id) => {

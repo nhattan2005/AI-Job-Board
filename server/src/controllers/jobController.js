@@ -71,7 +71,7 @@ const updateJob = async (req, res) => {
 // Get all active jobs (Public)
 const getJobs = async (req, res) => {
     try {
-        // 👇 THÊM ĐIỀU KIỆN: Không hiển thị job bị hidden
+        // 👇 THÊM avatar_url vào SELECT
         const result = await db.query(`
             SELECT 
                 j.*, 
@@ -79,7 +79,7 @@ const getJobs = async (req, res) => {
                 u.avatar_url
             FROM jobs j
             LEFT JOIN users u ON j.employer_id = u.id
-            WHERE j.status = 'active' AND j.is_hidden = FALSE
+            WHERE j.status = 'active' AND (j.is_hidden = FALSE OR j.is_hidden IS NULL)
             ORDER BY j.created_at DESC
         `);
         res.status(200).json(result.rows);
@@ -110,7 +110,7 @@ const getAllJobs = async (req, res) => {
 const getJobById = async (req, res) => {
     const { id } = req.params;
     try {
-        // 👇 CẬP NHẬT QUERY: Thêm deadline và subquery đếm số lượng application
+        // 👇 THÊM avatar_url vào SELECT
         const result = await db.query(`
             SELECT 
                 j.*, 
@@ -137,13 +137,18 @@ const getMyJobs = async (req, res) => {
     const employer_id = req.user.id;
     
     try {
+        // 👇 THÊM avatar_url, company_name
         const result = await db.query(`
             SELECT 
-                id, title, description, location, salary_range, 
-                employment_type, status, created_at
-            FROM jobs
-            WHERE employer_id = $1
-            ORDER BY created_at DESC
+                j.id, j.title, j.description, j.location, j.salary_range, 
+                j.employment_type, j.status, j.created_at,
+                u.company_name,
+                u.avatar_url,
+                (SELECT COUNT(*)::int FROM applications a WHERE a.job_id = j.id) as application_count
+            FROM jobs j
+            LEFT JOIN users u ON j.employer_id = u.id
+            WHERE j.employer_id = $1
+            ORDER BY j.created_at DESC
         `, [employer_id]);
         
         res.json(result.rows);
@@ -175,10 +180,10 @@ const getJobApplications = async (req, res) => {
                 a.id, a.status, a.applied_at, a.match_score, a.ai_advice, a.cover_letter,
                 u.id as candidate_id, u.email as candidate_email, 
                 u.full_name as candidate_name, u.skills as candidate_skills,
-                c.cv_text, c.filename as cv_filename, c.file_path
+                c.cv_text, c.filename as cv_filename, c.file_path -- 👈 ĐẢM BẢO CÓ filename
             FROM applications a
             JOIN users u ON a.candidate_id = u.id
-            JOIN cvs c ON a.cv_id = c.id
+            LEFT JOIN cvs c ON a.cv_id = c.id
             WHERE a.job_id = $1
             ORDER BY a.applied_at DESC
         `, [id]);

@@ -6,7 +6,8 @@ const {
     getMyApplications, 
     analyzeApplication, 
     updateApplicationStatus,
-    checkApplicationStatus 
+    checkApplicationStatus,
+    downloadCV 
 } = require('../controllers/applicationController');
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.get('/check/:jobId', verifyToken, verifyCandidate, checkApplicationStatus
 
 // Employer routes
 router.patch('/:id/status', verifyToken, verifyEmployer, updateApplicationStatus);
+router.get('/:applicationId/download-cv', verifyToken, verifyEmployer, downloadCV);
 
 module.exports = router;
