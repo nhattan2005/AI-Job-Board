@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navigation from './components/Navigation';
+import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Import đầy đủ các Pages & Components
@@ -27,14 +28,16 @@ import VerifyEmailSentPage from './pages/VerifyEmailSentPage';
 import AdminDashboard from './pages/AdminDashboard'; // 👈 THÊM
 import AdminUsers from './pages/AdminUsers'; // 👈 THÊM
 import AdminJobs from './pages/AdminJobs'; // 👈 THÊM
+import PrivacyPage from './pages/PrivacyPage'; // THÊM
+import TermsPage from './pages/TermsPage';
 
 const App = () => {
     return (
         <Router>
             <AuthProvider>
-                <div className="min-h-screen bg-slate-50"> {/* Đổi bg-gray-50 thành bg-slate-50 cho đẹp */}
+                <div className="min-h-screen bg-slate-50 flex flex-col"> {/* Đổi bg-gray-50 thành bg-slate-50 cho đẹp */}
                     <Navigation />
-                    <main className="container mx-auto p-6">
+                    <main className="container mx-auto p-6 flex-grow">
                         <Routes>
                             {/* Public Routes */}
                             <Route path="/" element={<JobList />} />
@@ -194,10 +197,15 @@ const App = () => {
                                 } 
                             />
 
+                            {/* THÊM ROUTE CHO TRANG QUYỀN RIÊNG TƯ */}
+                            <Route path="/privacy-policy" element={<PrivacyPage />} />
+                            <Route path="/terms-of-service" element={<TermsPage />} />
+
                             {/* 404 Page */}
                             <Route path="*" element={<h1>404 Not Found</h1>} />
                         </Routes>
                     </main>
+                    <Footer />
                 </div>
             </AuthProvider>
         </Router>
