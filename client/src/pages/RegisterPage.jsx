@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -7,6 +7,8 @@ import PasswordStrengthIndicator from '../components/PasswordStrengthIndicator';
 const RegisterPage = () => {
     const navigate = useNavigate();
     const { register } = useAuth();
+    
+    const topRef = useRef(null);
 
     const [role, setRole] = useState('candidate');
     const [email, setEmail] = useState('');
@@ -26,13 +28,20 @@ const RegisterPage = () => {
     const [loading, setLoading] = useState(false);
     const [verificationType, setVerificationType] = useState('otp');
 
-    // 👇 THÊM: Prevent multiple submissions
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (error && topRef.current) {
+            topRef.current.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
+        }
+    }, [error]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         
-        // 👇 THÊM: Check if already submitting
         if (isSubmitting) {
             console.log('⚠️ Already submitting, ignoring duplicate request');
             return;
@@ -65,12 +74,21 @@ const RegisterPage = () => {
             return;
         }
 
+        if (role === 'candidate' && !fullName) {
+            setError('Full name is required for candidates');
+            return;
+        }
+
+        if (role === 'employer' && !companyName) {
+            setError('Company name is required for employers');
+            return;
+        }
+
         if (!phone) {
             setError('Phone number is required');
             return;
         }
 
-        // 👇 SET FLAGS
         setLoading(true);
         setIsSubmitting(true);
 
@@ -124,7 +142,6 @@ const RegisterPage = () => {
             setError(err.response?.data?.error || 'Registration failed. Please try again.');
         } finally {
             setLoading(false);
-            // 👇 THÊM: Reset after 2 seconds để tránh spam
             setTimeout(() => {
                 setIsSubmitting(false);
             }, 2000);
@@ -133,7 +150,7 @@ const RegisterPage = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-            <div className="max-w-2xl mx-auto bg-white p-10 rounded-xl shadow-2xl">
+            <div ref={topRef} className="max-w-2xl mx-auto bg-white p-10 rounded-xl shadow-2xl">
                 <div className="mb-8">
                     <h2 className="text-center text-3xl font-extrabold text-gray-900">
                         Create your account
@@ -147,8 +164,16 @@ const RegisterPage = () => {
                 </div>
 
                 {error && (
-                    <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                        {error}
+                    <div className="mb-6 bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-4 rounded-lg shadow-md animate-shake">
+                        <div className="flex items-start">
+                            <svg className="h-5 w-5 text-red-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="flex-1">
+                                <p className="font-semibold">Registration Error</p>
+                                <p className="text-sm mt-1">{error}</p>
+                            </div>
+                        </div>
                     </div>
                 )}
 

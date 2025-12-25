@@ -8,6 +8,10 @@ const JobList = () => {
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterLocation, setFilterLocation] = useState('');
+    
+    // 👇 THÊM STATE CHO PAGINATION
+    const [currentPage, setCurrentPage] = useState(1);
+    const [jobsPerPage] = useState(9); // Hiển thị 9 jobs mỗi trang (3x3 grid)
 
     // SỬA LẠI HÀM NÀY
     const formatSalary = (job) => {
@@ -44,6 +48,11 @@ const JobList = () => {
         fetchJobs();
     }, []);
 
+    // 👇 RESET TRANG VỀ 1 KHI SEARCH HOẶC FILTER THAY ĐỔI
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, filterLocation]);
+
     const filteredJobs = jobs.filter(job => {
         // Kiểm tra an toàn null/undefined trước khi gọi toLowerCase()
         const title = job.title || '';
@@ -58,6 +67,51 @@ const JobList = () => {
         const matchesLocation = filterLocation === '' || location === filterLocation;
         return matchesSearch && matchesLocation;
     });
+
+    // 👇 TÍNH TOÁN PAGINATION
+    const totalPages = Math.ceil(filteredJobs.length / jobsPerPage);
+    const indexOfLastJob = currentPage * jobsPerPage;
+    const indexOfFirstJob = indexOfLastJob - jobsPerPage;
+    const currentJobs = filteredJobs.slice(indexOfFirstJob, indexOfLastJob);
+
+    // 👇 HÀM CHUYỂN TRANG
+    const paginate = (pageNumber) => {
+        setCurrentPage(pageNumber);
+        // Cuộn lên đầu danh sách jobs
+        document.getElementById('job-list-section')?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // 👇 TẠO ARRAY CÁC SỐ TRANG
+    const getPageNumbers = () => {
+        const pageNumbers = [];
+        const maxPagesToShow = 5;
+        
+        if (totalPages <= maxPagesToShow) {
+            // Nếu ít hơn 5 trang, hiển thị tất cả
+            for (let i = 1; i <= totalPages; i++) {
+                pageNumbers.push(i);
+            }
+        } else {
+            // Logic hiển thị thông minh: 1 ... 3 4 [5] 6 7 ... 20
+            if (currentPage <= 3) {
+                for (let i = 1; i <= 4; i++) pageNumbers.push(i);
+                pageNumbers.push('...');
+                pageNumbers.push(totalPages);
+            } else if (currentPage >= totalPages - 2) {
+                pageNumbers.push(1);
+                pageNumbers.push('...');
+                for (let i = totalPages - 3; i <= totalPages; i++) pageNumbers.push(i);
+            } else {
+                pageNumbers.push(1);
+                pageNumbers.push('...');
+                for (let i = currentPage - 1; i <= currentPage + 1; i++) pageNumbers.push(i);
+                pageNumbers.push('...');
+                pageNumbers.push(totalPages);
+            }
+        }
+        
+        return pageNumbers;
+    };
 
     if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
     if (error) return <div className="text-center py-20 text-red-600">{error}</div>;
@@ -75,7 +129,7 @@ const JobList = () => {
                     Find Your <span className="gradient-text">Dream IT Job</span>
                 </h1>
                 <p className="text-xl text-slate-500 max-w-2xl mx-auto">
-                    Discover {jobs.length} curated opportunities enhanced by AI matching technology.
+                    Unlock Your Future, Find the Job You Deserve.
                 </p>
             </div>
 
@@ -133,9 +187,9 @@ const JobList = () => {
                 </select>
             </div>
 
-            {/* Job Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredJobs.map((job) => (
+            {/* 👇 THAY THẾ filteredJobs BẰNG currentJobs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+                {currentJobs.map((job) => (
                     <Link 
                         to={`/jobs/${job.id}`} 
                         key={job.id} 
@@ -192,6 +246,65 @@ const JobList = () => {
                     </Link>
                 ))}
             </div>
+            
+            {/* 👇 THÊM PAGINATION UI */}
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-12">
+                    {/* Previous Button */}
+                    <button
+                        onClick={() => paginate(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Previous
+                    </button>
+
+                    {/* Page Numbers */}
+                    <div className="flex gap-1">
+                        {getPageNumbers().map((pageNum, index) => (
+                            pageNum === '...' ? (
+                                <span key={`ellipsis-${index}`} className="px-4 py-2 text-slate-400">
+                                    ...
+                                </span>
+                            ) : (
+                                <button
+                                    key={pageNum}
+                                    onClick={() => paginate(pageNum)}
+                                    className={`px-4 py-2 rounded-lg font-semibold transition ${
+                                        currentPage === pageNum
+                                            ? 'bg-primary-600 text-white shadow-md'
+                                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    {pageNum}
+                                </button>
+                            )
+                        ))}
+                    </div>
+
+                    {/* Next Button */}
+                    <button
+                        onClick={() => paginate(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
+                    >
+                        Next
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+            )}
+
+            {/* 👇 THÊM THÔNG TIN HIỂN THỊ */}
+            {filteredJobs.length > 0 && (
+                <div className="text-center mt-6 text-sm text-slate-500">
+                    Showing <span className="font-semibold text-slate-700">{indexOfFirstJob + 1}-{Math.min(indexOfLastJob, filteredJobs.length)}</span> of <span className="font-semibold text-slate-700">{filteredJobs.length}</span> jobs
+                </div>
+            )}
             
             {/* Empty State */}
             {filteredJobs.length === 0 && (
