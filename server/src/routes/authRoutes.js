@@ -18,7 +18,8 @@ router.post('/login', login);
 
 // Protected routes
 router.get('/profile', verifyToken, getProfile);
-router.patch('/profile', verifyToken, updateProfile);
+router.put('/profile', verifyToken, updateProfile);
+router.patch('/profile', verifyToken, updateProfile); // Cho phép cả PUT và PATCH
 router.patch('/change-password', verifyToken, changePassword);
 
 // 👇 ROUTE UPLOAD AVATAR

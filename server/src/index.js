@@ -14,6 +14,7 @@ const employerEmailRoutes = require('./routes/employerEmailRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
 const mockInterviewRoutes = require('./routes/mockInterviewRoutes');
 const adminRoutes = require('./routes/adminRoutes'); // 👈 THÊM DÒNG NÀY
+const bannerRoutes = require('./routes/bannerRoutes'); // 👈 THÊM
 const errorHandler = require('./middleware/errorHandler');
 const db = require('./config/database');
 
@@ -42,17 +43,18 @@ app.use((req, res, next) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRoutes); // 👈 ĐẢM BẢO DÒNG NÀY CÓ
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/cv', cvRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/employer', employerRoutes);
-app.use('/api/employer', employerEmailRoutes);
-app.use('/api/interviews', interviewRoutes);
 app.use('/api/career', careerRoutes);
+app.use('/api/interview', interviewRoutes);
 app.use('/api/mock-interview', mockInterviewRoutes);
-app.use('/api/admin', adminRoutes); // 👈 THÊM DÒNG NÀY
+app.use('/api/employer-email', employerEmailRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/banners', bannerRoutes); // 👈 THÊM
 
 // Health check endpoint
 app.get('/health', async (req, res) => {

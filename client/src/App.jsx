@@ -28,6 +28,7 @@ import VerifyEmailSentPage from './pages/VerifyEmailSentPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminJobs from './pages/AdminJobs';
+import AdminBanners from './pages/AdminBanners'; // 👈 IMPORT
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 
@@ -182,6 +183,7 @@ const App = () => {
                                     </ProtectedRoute>
                                 } 
                             />
+                            <Route path="/admin/banners" element={<AdminBanners />} /> {/* 👈 THÊM */}
 
                             <Route path="/privacy-policy" element={<PrivacyPage />} />
                             <Route path="/terms-of-service" element={<TermsPage />} />

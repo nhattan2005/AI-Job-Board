@@ -9,11 +9,17 @@ const JobList = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterLocation, setFilterLocation] = useState('');
     
-    // 👇 THÊM STATE CHO PAGINATION
+    // 👇 THÊM STATE CHO BỘ LỌC MỚI
+    const [filterEmploymentType, setFilterEmploymentType] = useState('');
+    const [filterSalaryMin, setFilterSalaryMin] = useState('');
+    const [filterSalaryMax, setFilterSalaryMax] = useState('');
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    
     const [currentPage, setCurrentPage] = useState(1);
-    const [jobsPerPage] = useState(9); // Hiển thị 9 jobs mỗi trang (3x3 grid)
+    const [jobsPerPage] = useState(9);
+    const [currentBanner, setCurrentBanner] = useState(0);
+    const [banners, setBanners] = useState([]); // 👈 THAY ĐỔI
 
-    // SỬA LẠI HÀM NÀY
     const formatSalary = (job) => {
         // 1. Ưu tiên hiển thị salary_range (chuỗi) nếu có
         if (job.salary_range) return job.salary_range;
@@ -31,41 +37,112 @@ const JobList = () => {
         return `$${format(min)} - $${format(max)}`;
     };
 
+    // 👇 HÀM EXTRACT SALARY NUMBER TỪ STRING
+    const extractSalaryNumber = (salaryString) => {
+        if (!salaryString || salaryString.toLowerCase().includes('negotiable')) return null;
+        // Extract số từ string như "$120k - $180k" hoặc "$1000 - $2000"
+        const matches = salaryString.match(/\d+\.?\d*/g);
+        if (!matches) return null;
+        
+        // Lấy số đầu tiên (min salary)
+        let num = parseFloat(matches[0]);
+        
+        // Nếu có "k" sau số => nhân 1000
+        if (salaryString.toLowerCase().includes('k')) {
+            num *= 1000;
+        }
+        
+        return num;
+    };
+
     useEffect(() => {
         const fetchJobs = async () => {
             try {
-                const res = await api.get('/jobs');
-                // Đảm bảo res.data là mảng, nếu không thì gán mảng rỗng
-                setJobs(Array.isArray(res.data) ? res.data : []);
-            } catch (err) {
-                setError('Failed to fetch jobs');
-                console.error(err);
+                setLoading(true);
+                const response = await api.get('/jobs');
+                setJobs(response.data);
+            } catch (error) {
+                setError('Failed to load jobs. Please try again later.');
+                console.error('Error fetching jobs:', error);
             } finally {
                 setLoading(false);
             }
         };
 
+        const fetchBanners = async () => {
+            try {
+                const response = await api.get('/banners/active');
+                setBanners(response.data);
+            } catch (error) {
+                console.error('Error fetching banners:', error);
+                // Fallback to default banners if API fails
+                setBanners([
+                    { id: 1, title: 'Find Your Dream Job', subtitle: 'Thousands of opportunities waiting', image_url: '/images/banner1.jpg' },
+                    { id: 2, title: 'Career Growth', subtitle: 'Connect with top employers', image_url: '/images/banner2.jpg' },
+                    { id: 3, title: 'Your Future Awaits', subtitle: 'Discover opportunities', image_url: '/images/banner3.png' }
+                ]);
+            }
+        };
+
         fetchJobs();
+        fetchBanners(); // 👈 THÊM
     }, []);
 
     // 👇 RESET TRANG VỀ 1 KHI SEARCH HOẶC FILTER THAY ĐỔI
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterLocation]);
+    }, [searchTerm, filterLocation, filterEmploymentType, filterSalaryMin, filterSalaryMax]);
 
+    // 👇 AUTO-SLIDE CAROUSEL
+    useEffect(() => {
+        if (banners.length === 0) return;
+        
+        const savedDuration = parseInt(localStorage.getItem('bannerDuration')) || 8;
+        
+        const timer = setInterval(() => {
+            setCurrentBanner((prev) => (prev + 1) % banners.length);
+        }, savedDuration * 1000);
+
+        return () => clearInterval(timer);
+    }, [banners.length, currentBanner]);
+
+    // 👇 CẬP NHẬT LOGIC LỌC
     const filteredJobs = jobs.filter(job => {
         // Kiểm tra an toàn null/undefined trước khi gọi toLowerCase()
         const title = job.title || '';
         const company = job.company_name || '';
         const desc = job.description || '';
         const location = job.location || '';
+        const employmentType = job.employment_type || '';
 
+        // 1. Search term
         const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             company.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             desc.toLowerCase().includes(searchTerm.toLowerCase());
         
+        // 2. Location filter
         const matchesLocation = filterLocation === '' || location === filterLocation;
-        return matchesSearch && matchesLocation;
+        
+        // 3. Employment Type filter
+        const matchesEmploymentType = filterEmploymentType === '' || employmentType === filterEmploymentType;
+        
+        // 4. Salary filter
+        let matchesSalary = true;
+        if (filterSalaryMin || filterSalaryMax) {
+            const jobSalary = extractSalaryNumber(job.salary_range);
+            
+            if (jobSalary === null) {
+                // Nếu không parse được lương (Negotiable) => vẫn show
+                matchesSalary = true;
+            } else {
+                const minFilter = filterSalaryMin ? parseFloat(filterSalaryMin) : 0;
+                const maxFilter = filterSalaryMax ? parseFloat(filterSalaryMax) : Infinity;
+                
+                matchesSalary = jobSalary >= minFilter && jobSalary <= maxFilter;
+            }
+        }
+
+        return matchesSearch && matchesLocation && matchesEmploymentType && matchesSalary;
     });
 
     // 👇 TÍNH TOÁN PAGINATION
@@ -81,49 +158,74 @@ const JobList = () => {
         document.getElementById('job-list-section')?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    // 👇 TẠO ARRAY CÁC SỐ TRANG
-    const getPageNumbers = () => {
-        const pageNumbers = [];
-        const maxPagesToShow = 5;
-        
-        if (totalPages <= maxPagesToShow) {
-            // Nếu ít hơn 5 trang, hiển thị tất cả
-            for (let i = 1; i <= totalPages; i++) {
-                pageNumbers.push(i);
-            }
-        } else {
-            // Logic hiển thị thông minh: 1 ... 3 4 [5] 6 7 ... 20
-            if (currentPage <= 3) {
-                for (let i = 1; i <= 4; i++) pageNumbers.push(i);
-                pageNumbers.push('...');
-                pageNumbers.push(totalPages);
-            } else if (currentPage >= totalPages - 2) {
-                pageNumbers.push(1);
-                pageNumbers.push('...');
-                for (let i = totalPages - 3; i <= totalPages; i++) pageNumbers.push(i);
-            } else {
-                pageNumbers.push(1);
-                pageNumbers.push('...');
-                for (let i = currentPage - 1; i <= currentPage + 1; i++) pageNumbers.push(i);
-                pageNumbers.push('...');
-                pageNumbers.push(totalPages);
-            }
-        }
-        
-        return pageNumbers;
+    // 👇 HÀM RESET FILTERS
+    const resetFilters = () => {
+        setSearchTerm('');
+        setFilterLocation('');
+        setFilterEmploymentType('');
+        setFilterSalaryMin('');
+        setFilterSalaryMax('');
+        setCurrentPage(1);
     };
 
-    if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
-    if (error) return <div className="text-center py-20 text-red-600">{error}</div>;
+    // 👇 ĐẾM SỐ FILTER ĐANG ACTIVE
+    const activeFiltersCount = [filterLocation, filterEmploymentType, filterSalaryMin, filterSalaryMax]
+        .filter(f => f !== '').length;
+
+    // 👇 TẠO ARRAY CÁC SỐ TRANG
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    if (endPage - startPage < maxVisiblePages - 1) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+    }
+
+    // 👇 FUNCTIONS ĐIỀU KHIỂN CAROUSEL
+    const nextBanner = () => {
+        setCurrentBanner((prev) => (prev + 1) % banners.length); // 👈 DYNAMIC
+    };
+
+    const prevBanner = () => {
+        setCurrentBanner((prev) => (prev - 1 + banners.length) % banners.length); // 👈 DYNAMIC
+    };
+
+    const goToBanner = (index) => {
+        setCurrentBanner(index);
+    };
+
+    // 👇 ĐỊNH NGHĨA CÁC BANNER
+    const defaultBanners = [
+        {
+            id: 1,
+            image: "/images/banner1.jpg",
+            alt: "Banner 1"
+        },
+        {
+            id: 2,
+            image: "/images/banner2.jpg",
+            alt: "Banner 2"
+        },
+        {
+            id: 3,
+            image: "/images/banner3.png",
+            alt: "Banner 3"
+        }
+    ];
 
     // Helper lấy URL ảnh
     const getImageUrl = (path) => path ? `http://localhost:5000${path}` : null;
 
+    if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div></div>;
+    if (error) return <div className="text-center py-20 text-red-600 font-bold">{error}</div>;
+
     return (
-        <div className="max-w-7xl mx-auto pt-24 pb-12 px-4 sm:px-6">
-            
+        <div className="max-w-7xl mx-auto px-4 py-8">
             {/* Hero Section */}
-            <div className="text-center mb-12 relative">
+            <div className="text-center mb-10 relative">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-primary-500/20 rounded-full blur-[100px] -z-10"></div>
                 <h1 className="text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">
                     Find Your <span className="gradient-text">Dream IT Job</span>
@@ -133,61 +235,188 @@ const JobList = () => {
                 </p>
             </div>
 
-            {/* AI Banner */}
-            <div className="mb-10 relative overflow-hidden rounded-2xl bg-slate-900 text-white shadow-2xl shadow-primary-900/20">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500 rounded-full blur-[80px] opacity-20"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary-500 rounded-full blur-[80px] opacity-20"></div>
-                
-                <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex items-start gap-6">
-                        <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-sm border border-white/10">
-                            <svg className="h-10 w-10 text-primary-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
+            {/* Carousel Banner */}
+            <div className="mb-10 relative overflow-hidden rounded-2xl shadow-2xl group">
+                <div className="relative w-full" style={{ aspectRatio: '16/5' }}>
+                    {banners.map((banner, index) => (
+                        <div
+                            key={banner.id}
+                            className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                                index === currentBanner ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+                            }`}
+                        >
+                            <img src={banner.image_url} alt={banner.title} className="w-full h-full object-cover" />
                         </div>
-                        <div>
-                            <h3 className="text-2xl font-bold mb-2">AI Career Path Analyzer</h3>
-                            <p className="text-slate-300 text-lg max-w-xl">
-                                Stop guessing. Let AI analyze your CV and build a personalized roadmap to your dream salary.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex gap-3">
-                        <Link to="/career-path" className="px-8 py-4 bg-white text-slate-900 rounded-xl font-bold hover:bg-primary-50 transition-all hover:scale-105 shadow-lg whitespace-nowrap">
-                            Try It →
-                        </Link>
-                    </div>
+                    ))}
                 </div>
-            </div>
 
-            {/* Search & Filter Bar */}
-            <div id="job-list-section" className="bg-white rounded-2xl shadow-soft p-2 mb-10 flex flex-col md:flex-row gap-2 border border-slate-100">
-                <div className="relative flex-1">
-                    <svg className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                {/* Navigation Buttons - Hiện khi hover */}
+                <button
+                    onClick={prevBanner}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-white hover:scale-110 transition-all shadow-lg"
+                    aria-label="Previous"
+                >
+                    <svg className="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" />
                     </svg>
-                    <input
-                        type="text"
-                        placeholder="Search by title, company, or keywords..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 rounded-xl border-none focus:ring-0 text-slate-700 placeholder-slate-400 bg-transparent outline-none"
+                </button>
+
+                <button
+                    onClick={nextBanner}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-white hover:scale-110 transition-all shadow-lg"
+                    aria-label="Next"
+                >
+                    <svg className="w-5 h-5 text-slate-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+
+                {/* Dots Indicator - UPDATE LENGTH */}
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                    {banners.map((_, index) => (
+                        <button
+                            key={index}
+                            onClick={() => goToBanner(index)}
+                            className={`h-2 rounded-full transition-all ${
+                                index === currentBanner 
+                                    ? 'bg-white w-8' 
+                                    : 'bg-white/50 hover:bg-white/75 w-2'
+                            }`}
+                            aria-label={`Go to banner ${index + 1}`}
+                        />
+                    ))}
+                </div>
+
+                {/* Progress Bar - UPDATE CALCULATION */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                    <div 
+                        className="h-full bg-white transition-all duration-300 ease-linear"
+                        style={{ width: `${((currentBanner + 1) / (banners.length || 1)) * 100}%` }}
                     />
                 </div>
-                <div className="h-px md:h-12 w-full md:w-px bg-slate-100"></div>
-                <select
-                    value={filterLocation}
-                    onChange={(e) => setFilterLocation(e.target.value)}
-                    className="md:w-48 px-4 py-3 rounded-xl border-none focus:ring-0 text-slate-600 bg-transparent cursor-pointer hover:bg-slate-50 transition outline-none"
-                >
-                    <option value="">All Locations</option>
-                    {[...new Set(jobs.map(job => job.location).filter(Boolean))].map(loc => (
-                        <option key={loc} value={loc}>{loc}</option>
-                    ))}
-                </select>
             </div>
 
-            {/* 👇 THAY THẾ filteredJobs BẰNG currentJobs */}
+            {/* 👇 SEARCH & FILTER BAR - CẬP NHẬT */}
+            <div id="job-list-section" className="bg-white rounded-2xl shadow-soft p-4 mb-6 border border-slate-100">
+                {/* Search Bar */}
+                <div className="flex flex-col md:flex-row gap-2 mb-4">
+                    <div className="relative flex-1">
+                        <svg className="absolute left-4 top-3.5 h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            placeholder="Search by title, company, or keywords..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-12 pr-4 py-3 rounded-xl border-none focus:ring-0 text-slate-700 placeholder-slate-400 bg-transparent outline-none"
+                        />
+                    </div>
+                    
+                    {/* Toggle Advanced Filters Button */}
+                    <button
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        className="px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition flex items-center justify-center gap-2 relative"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                        Filters
+                        {activeFiltersCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                {activeFiltersCount}
+                            </span>
+                        )}
+                    </button>
+                </div>
+
+                {/* 👇 ADVANCED FILTERS - HIỂN THỊ KHI CLICK */}
+                {showAdvancedFilters && (
+                    <div className="pt-4 border-t border-slate-100 animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {/* Location Filter */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
+                                    📍 Location
+                                </label>
+                                <select
+                                    value={filterLocation}
+                                    onChange={(e) => setFilterLocation(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                >
+                                    <option value="">All Locations</option>
+                                    {[...new Set(jobs.map(job => job.location).filter(Boolean))].map(loc => (
+                                        <option key={loc} value={loc}>{loc}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Employment Type Filter */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
+                                    💼 Job Type
+                                </label>
+                                <select
+                                    value={filterEmploymentType}
+                                    onChange={(e) => setFilterEmploymentType(e.target.value)}
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                >
+                                    <option value="">All Types</option>
+                                    <option value="full-time">Full-time</option>
+                                    <option value="part-time">Part-time</option>
+                                    <option value="contract">Contract</option>
+                                    <option value="internship">Internship</option>
+                                </select>
+                            </div>
+
+                            {/* Salary Min Filter */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
+                                    💰 Min Salary ($)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={filterSalaryMin}
+                                    onChange={(e) => setFilterSalaryMin(e.target.value)}
+                                    placeholder="e.g. 50000"
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                />
+                            </div>
+
+                            {/* Salary Max Filter */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">
+                                    💸 Max Salary ($)
+                                </label>
+                                <input
+                                    type="number"
+                                    value={filterSalaryMax}
+                                    onChange={(e) => setFilterSalaryMax(e.target.value)}
+                                    placeholder="e.g. 150000"
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Reset Button */}
+                        {activeFiltersCount > 0 && (
+                            <div className="mt-4 flex justify-end">
+                                <button
+                                    onClick={resetFilters}
+                                    className="px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-semibold text-sm transition flex items-center gap-2"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                    Clear All Filters
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Jobs Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
                 {currentJobs.map((job) => (
                     <Link 
@@ -196,7 +425,6 @@ const JobList = () => {
                         className="group bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-primary-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col h-full"
                     >
                         <div className="flex justify-between items-start mb-4">
-                            {/* 👇 THAY THẾ PHẦN HIỂN THỊ LOGO CŨ */}
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-xl font-bold text-slate-600 border border-slate-200 overflow-hidden">
                                 {job.avatar_url ? (
                                     <img 
@@ -213,7 +441,6 @@ const JobList = () => {
                                     job.company_name?.charAt(0) || 'C'
                                 )}
                             </div>
-                            
                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary-50 text-primary-700 border border-primary-100">
                                 {job.employment_type || 'Full-time'}
                             </span>
@@ -232,11 +459,10 @@ const JobList = () => {
                                 </svg>
                                 {job.location || 'Remote'}
                             </div>
-                            <div className="flex items-center text-slate-500 text-sm">
-                                <svg className="h-4 w-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="flex items-center text-primary-600 text-sm font-bold">
+                                <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                {/* THAY THẾ DÒNG CŨ BẰNG DÒNG NÀY */}
                                 {formatSalary(job)}
                             </div>
                         </div>
@@ -253,59 +479,59 @@ const JobList = () => {
                 ))}
             </div>
             
-            {/* 👇 THÊM PAGINATION UI */}
+            {/* Pagination */}
             {totalPages > 1 && (
                 <div className="flex justify-center items-center gap-2 mt-12">
-                    {/* Previous Button */}
                     <button
                         onClick={() => paginate(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
+                        className="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                        Previous
+                        ← Prev
                     </button>
 
-                    {/* Page Numbers */}
-                    <div className="flex gap-1">
-                        {getPageNumbers().map((pageNum, index) => (
-                            pageNum === '...' ? (
-                                <span key={`ellipsis-${index}`} className="px-4 py-2 text-slate-400">
-                                    ...
-                                </span>
-                            ) : (
-                                <button
-                                    key={pageNum}
-                                    onClick={() => paginate(pageNum)}
-                                    className={`px-4 py-2 rounded-lg font-semibold transition ${
-                                        currentPage === pageNum
-                                            ? 'bg-primary-600 text-white shadow-md'
-                                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    {pageNum}
-                                </button>
-                            )
-                        ))}
-                    </div>
+                    {startPage > 1 && (
+                        <>
+                            <button onClick={() => paginate(1)} className="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600 font-semibold transition">
+                                1
+                            </button>
+                            {startPage > 2 && <span className="text-slate-400">...</span>}
+                        </>
+                    )}
 
-                    {/* Next Button */}
+                    {pageNumbers.map(number => (
+                        <button
+                            key={number}
+                            onClick={() => paginate(number)}
+                            className={`w-10 h-10 rounded-lg font-semibold transition ${
+                                currentPage === number
+                                    ? 'bg-primary-600 text-white shadow-md'
+                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600'
+                            }`}
+                        >
+                            {number}
+                        </button>
+                    ))}
+
+                    {endPage < totalPages && (
+                        <>
+                            {endPage < totalPages - 1 && <span className="text-slate-400">...</span>}
+                            <button onClick={() => paginate(totalPages)} className="w-10 h-10 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-primary-50 hover:border-primary-300 hover:text-primary-600 font-semibold transition">
+                                {totalPages}
+                            </button>
+                        </>
+                    )}
+
                     <button
                         onClick={() => paginate(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2"
+                        className="px-4 py-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition font-semibold"
                     >
-                        Next
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                        </svg>
+                        Next →
                     </button>
                 </div>
             )}
 
-            {/* 👇 THÊM THÔNG TIN HIỂN THỊ */}
             {filteredJobs.length > 0 && (
                 <div className="text-center mt-6 text-sm text-slate-500">
                     Showing <span className="font-semibold text-slate-700">{indexOfFirstJob + 1}-{Math.min(indexOfLastJob, filteredJobs.length)}</span> of <span className="font-semibold text-slate-700">{filteredJobs.length}</span> jobs
@@ -322,6 +548,14 @@ const JobList = () => {
                     </div>
                     <h3 className="text-lg font-bold text-slate-900">No jobs found</h3>
                     <p className="text-slate-500">Try adjusting your search or filters</p>
+                    {activeFiltersCount > 0 && (
+                        <button
+                            onClick={resetFilters}
+                            className="mt-4 px-6 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 font-semibold transition"
+                        >
+                            Clear Filters
+                        </button>
+                    )}
                 </div>
             )}
         </div>

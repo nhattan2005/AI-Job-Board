@@ -361,7 +361,6 @@ const getProfile = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // 👇 THÊM avatar_url vào SELECT
         const result = await db.query(
             `SELECT 
                 id, email, role, full_name, bio, skills, 
@@ -398,7 +397,7 @@ const updateProfile = async (req, res) => {
                 `UPDATE users 
                  SET phone = $1, full_name = $2, bio = $3, skills = $4, updated_at = CURRENT_TIMESTAMP
                  WHERE id = $5
-                 RETURNING id, email, role, full_name, bio, skills, phone, created_at`,
+                 RETURNING id, email, role, full_name, bio, skills, phone, avatar_url, created_at`,
                 [phone, full_name, bio || '', skills || [], userId]
             );
         } else {
@@ -406,7 +405,7 @@ const updateProfile = async (req, res) => {
                 `UPDATE users 
                  SET phone = $1, company_name = $2, company_description = $3, website = $4, updated_at = CURRENT_TIMESTAMP
                  WHERE id = $5
-                 RETURNING id, email, role, company_name, company_description, website, phone, created_at`,
+                 RETURNING id, email, role, company_name, company_description, website, phone, avatar_url, created_at`,
                 [phone, company_name, company_description || '', website || '', userId]
             );
         }
