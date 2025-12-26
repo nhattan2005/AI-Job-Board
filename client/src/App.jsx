@@ -31,6 +31,10 @@ import AdminJobs from './pages/AdminJobs';
 import AdminBanners from './pages/AdminBanners'; // 👈 IMPORT
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
+import MyFavorites from './pages/MyFavorites'; // 👈 THÊM IMPORT
+import PracticeInterviewSetup from './pages/PracticeInterviewSetup'; // 👈 THÊM
+import PracticeInterviewRoom from './pages/PracticeInterviewRoom'; // 👈 THÊM
+import NotificationsPage from './pages/NotificationsPage'; // 👈 THÊM
 
 const App = () => {
     return (
@@ -55,6 +59,35 @@ const App = () => {
                                 element={
                                     <ProtectedRoute requiredRole="candidate">
                                         <CareerPath />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
+                            {/* 👇 THÊM ROUTE MY FAVORITES */}
+                            <Route 
+                                path="/my-favorites" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <MyFavorites />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
+                            {/* 👇 THÊM PRACTICE INTERVIEW ROUTES */}
+                            <Route 
+                                path="/practice-interview" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <PracticeInterviewSetup />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
+                            <Route 
+                                path="/practice-interview/room/:sessionId" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <PracticeInterviewRoom />
                                     </ProtectedRoute>
                                 } 
                             />

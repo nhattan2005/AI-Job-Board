@@ -3,11 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import api from '../services/api';
 
-const InterviewRoom = () => {
-    const { jobId, type } = useParams();
+const PracticeInterviewRoom = () => {
+    const { sessionId } = useParams();
     const navigate = useNavigate();
-    const [sessionId, setSessionId] = useState(null);
-    const [jobDetails, setJobDetails] = useState(null);
     const [messages, setMessages] = useState([]);
     const [processing, setProcessing] = useState(false);
     const [questionCount, setQuestionCount] = useState(0);
@@ -15,6 +13,7 @@ const InterviewRoom = () => {
     const [inputMode, setInputMode] = useState('voice');
     const [textInput, setTextInput] = useState('');
     const messagesEndRef = useRef(null);
+    const chatContainerRef = useRef(null); // 👈 THÊM: Ref cho chat container
     
     const {
         transcript,
@@ -23,189 +22,123 @@ const InterviewRoom = () => {
         browserSupportsSpeechRecognition
     } = useSpeechRecognition();
 
-    // Tự động cuộn xuống cuối chat
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-    useEffect(scrollToBottom, [messages]);
-
-    // Khởi tạo session
+    // 👇 SỬA: Auto scroll CHỈ trong chat container (không kéo xuống footer)
     useEffect(() => {
-        let isMounted = true;
-        
-        const initSession = async () => {
-            if (sessionId) {
-                console.log('⚠️ Session already exists, skipping init');
-                return;
-            }
-            
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages, processing]);
+
+    // Load session history
+    useEffect(() => {
+        const loadSession = async () => {
             try {
-                console.log('🚀 Sending POST /mock-interview/start', { jobId, type });
-                
-                const res = await api.post('/mock-interview/start', { jobId, type });
-                
-                console.log('✅ Response received:', {
-                    sessionId: res.data.sessionId,
-                    message: res.data.message,
-                    jobDetails: res.data.jobDetails
-                });
-                
-                if (isMounted) {
-                    setSessionId(res.data.sessionId);
-                    setJobDetails(res.data.jobDetails);
-                    setMessages([{ role: 'ai', text: res.data.message }]);
-                    setQuestionCount(1);
-                    
-                    console.log('✅ State updated successfully');
+                const response = await api.get(`/mock-interview/session/${sessionId}`);
+                if (response.data.chat_history && response.data.chat_history.length > 0) {
+                    const history = response.data.chat_history;
+                    const formattedMessages = history.map(msg => ({
+                        role: msg.role === 'model' ? 'ai' : 'user',
+                        text: msg.parts?.[0]?.text || msg.text || ''
+                    }));
+                    setMessages(formattedMessages);
+                    setQuestionCount(history.filter(m => m.role === 'user').length);
                 }
             } catch (err) {
-                console.error('❌ Init session error:', err.response || err);
-                if (isMounted) {
-                    alert(`Failed to start interview: ${err.response?.data?.details || err.message}`);
-                    navigate(`/jobs/${jobId}`);
-                }
+                console.error('Failed to load session:', err);
             }
         };
-        
-        if (jobId && type && !sessionId) {
-            initSession();
+        if (sessionId) {
+            loadSession();
         }
-        
-        return () => {
-            isMounted = false;
-        };
-    }, [jobId, type]);
+    }, [sessionId]);
 
-    // Debug log
-    useEffect(() => {
-        console.log('🔍 Messages state changed:', messages);
-    }, [messages]);
+    // 👇 XÓA: Không tự động bật mic nữa
+    // useEffect(() => {
+    //     if (!listening && inputMode === 'voice' && !processing && messages.length > 0) {
+    //         ...
+    //     }
+    // }, [listening, processing, inputMode, messages.length]);
 
-    // Cleanup khi unmount
-    useEffect(() => {
-        return () => {
-            if (listening) {
-                SpeechRecognition.stopListening();
-            }
-        };
-    }, [listening]);
-
-    // Bắt đầu nói
+    // 👇 SỬA: Chỉ bật mic khi user bấm "Start Speaking"
     const handleStartSpeaking = () => {
         resetTranscript();
         SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
     };
 
-    // Handle send
-    const handleSend = async () => {
-        let userText;
+    // 👇 SỬA: Stop & Send khi user bấm nút
+    const handleStopAndSend = async () => {
+        SpeechRecognition.stopListening();
         
-        if (inputMode === 'voice') {
-            if (listening) {
-                SpeechRecognition.stopListening();
-            }
-            userText = transcript.trim();
-            if (!userText) {
-                alert('No speech detected. Please try again.');
-                return;
-            }
-        } else {
-            userText = textInput.trim();
-            if (!userText) {
-                alert('Please enter your answer');
-                return;
-            }
+        const userText = transcript.trim();
+        if (!userText) {
+            alert('No speech detected. Please try speaking again.');
+            return;
         }
-        
-        console.log('📝 User input:', userText);
 
-        setMessages(prev => [...prev, { role: 'user', text: userText }]);
-        setProcessing(true);
-        
-        if (inputMode === 'voice') {
-            resetTranscript();
-        } else {
-            setTextInput('');
+        await sendMessage(userText);
+        resetTranscript();
+    };
+
+    const handleSendText = async () => {
+        const userText = textInput.trim();
+        if (!userText) {
+            alert('Please type something');
+            return;
         }
+
+        await sendMessage(userText);
+        setTextInput('');
+    };
+
+    // 👇 TÁCH RA: Logic gửi message
+    const sendMessage = async (userText) => {
+        setProcessing(true);
+        setMessages(prev => [...prev, { role: 'user', text: userText }]);
 
         try {
-            console.log('📤 Sending to backend:', { sessionId, userText });
-            
             const res = await api.post('/mock-interview/chat', {
                 sessionId,
                 userText,
                 audioStats: { wpm: 0 }
             });
             
-            console.log('✅ Backend response:', res.data);
-            
-            if (!res.data.message || res.data.message.trim() === '') {
-                console.error('❌ Empty message from backend!');
-                setMessages(prev => [...prev, { 
-                    role: 'ai', 
-                    text: 'Sorry, I encountered an error. Please try again.' 
-                }]);
-            } else {
+            if (res.data.message) {
                 setMessages(prev => [...prev, { role: 'ai', text: res.data.message }]);
             }
 
-            // Cập nhật question count
             if (res.data.questionsAsked !== undefined) {
-                console.log('📊 Questions asked:', res.data.questionsAsked);
                 setQuestionCount(res.data.questionsAsked);
             }
 
-            // Kiểm tra xem đã hết 5 câu hỏi chưa
             if (res.data.questionsAsked >= 5) {
                 setInterviewCompleted(true);
                 setTimeout(() => {
                     navigate(`/interview/feedback/${sessionId}`);
                 }, 3000);
             }
+
         } catch (err) {
-            console.error('❌ Send error:', err);
-            setMessages(prev => [...prev, { 
-                role: 'ai', 
-                text: 'Sorry, I encountered an error. Please try again.' 
-            }]);
+            console.error('Chat error:', err);
+            alert('Failed to send message. Please try again.');
         } finally {
             setProcessing(false);
         }
     };
 
-    useEffect(() => {
-        if (!browserSupportsSpeechRecognition) return;
-
-        // Auto-restart khi bị ngắt
-        SpeechRecognition.getRecognition().onend = () => {
-            if (listening && !processing) {
-                console.log('🔄 Auto-restarting speech recognition...');
-                setTimeout(() => {
-                    SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
-                }, 500);
-            }
-        };
-
-        // Error handling
-        SpeechRecognition.getRecognition().onerror = (event) => {
-            console.error('🎤 Speech recognition error:', event.error);
-            if (event.error === 'no-speech') {
-                console.log('⚠️ No speech detected, restarting...');
-            }
-        };
-    }, [listening, processing, browserSupportsSpeechRecognition]);
-
-    // 👇 THÊM HÀM FORMAT
+    // 👇 THÊM HÀM: Format text với *bold*
     const formatMessage = (text) => {
         if (!text) return '';
         
+        // Split text theo pattern *text*
         const parts = text.split(/(\*[^*]+\*)/g);
         
         return parts.map((part, i) => {
+            // Nếu part bắt đầu và kết thúc bằng *, render bold
             if (part.startsWith('*') && part.endsWith('*')) {
-                const innerText = part.slice(1, -1);
+                const innerText = part.slice(1, -1); // Bỏ dấu *
                 return <strong key={i} className="font-bold">{innerText}</strong>;
             }
+            // Text thường
             return <span key={i}>{part}</span>;
         });
     };
@@ -216,9 +149,6 @@ const InterviewRoom = () => {
                 <div className="text-center">
                     <p className="text-red-600 font-bold mb-4">
                         Your browser doesn't support speech recognition.
-                    </p>
-                    <p className="text-gray-600 mb-4">
-                        Please use Google Chrome or Microsoft Edge, or switch to Text mode.
                     </p>
                     <button
                         onClick={() => setInputMode('text')}
@@ -234,15 +164,10 @@ const InterviewRoom = () => {
     return (
         <div className="flex flex-col h-screen bg-slate-50">
             {/* Header */}
-            <div className="bg-white border-b px-6 py-4 shadow-sm">
+            <div className="bg-white border-b px-6 py-4 shadow-sm flex-shrink-0">
                 <div className="max-w-5xl mx-auto flex justify-between items-center">
                     <div>
-                        <h1 className="text-xl font-bold text-slate-800">AI Mock Interview</h1>
-                        {jobDetails && (
-                            <p className="text-sm text-slate-600 mt-1">
-                                <span className="font-semibold">{jobDetails.title}</span> at {jobDetails.company} • {jobDetails.location} • {type === 'HR' ? '👤 HR Round' : '💻 Technical Round'}
-                            </p>
-                        )}
+                        <h1 className="text-xl font-bold text-slate-800">Practice Interview</h1>
                         <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                             <span>Question {questionCount}/5</span>
                             {questionCount >= 5 && <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded font-semibold">Complete</span>}
@@ -250,7 +175,7 @@ const InterviewRoom = () => {
                     </div>
                     <button 
                         onClick={() => {
-                            if (window.confirm('Are you sure you want to end this interview? Your progress will be saved.')) {
+                            if (window.confirm('End interview and get feedback?')) {
                                 navigate(`/interview/feedback/${sessionId}`);
                             }
                         }} 
@@ -262,51 +187,66 @@ const InterviewRoom = () => {
                 </div>
             </div>
 
-            {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50 min-h-[400px]">
+            {/* 👇 SỬA: Chat Area */}
+            <div 
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50"
+                style={{ maxHeight: 'calc(100vh - 280px)' }}
+            >
                 {messages.length === 0 ? (
                     <div className="text-center text-gray-500 py-10">
-                        <p className="font-bold text-lg">⚠️ No messages yet</p>
+                        <p className="font-bold text-lg">Loading interview...</p>
                     </div>
                 ) : (
                     <div className="space-y-4">
                         {messages.map((msg, idx) => (
                             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm ${
+                                <div className={`max-w-[70%] p-4 rounded-2xl shadow-md ${
                                     msg.role === 'user' 
-                                    ? 'bg-blue-600 text-white rounded-br-none' 
-                                    : 'bg-white border-2 border-slate-300 text-slate-800 rounded-bl-none'
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-white text-slate-800 border border-slate-200'
                                 }`}>
-                                    <div className="text-xs font-semibold mb-1 opacity-70">
-                                        {msg.role === 'user' ? 'You' : 'AI Interviewer'}
-                                    </div>
-                                    {/* 👇 SỬA: Format message */}
-                                    <div className="whitespace-pre-wrap">
+                                    {/* 👇 SỬA: Format message với bold */}
+                                    <p className="whitespace-pre-wrap">
                                         {msg.role === 'ai' ? formatMessage(msg.text) : msg.text}
-                                    </div>
+                                    </p>
                                 </div>
                             </div>
                         ))}
-                    </div>
-                )}
 
-                {processing && (
-                    <div className="text-slate-400 text-sm italic ml-4 flex items-center">
-                        <div className="animate-spin h-4 w-4 border-2 border-slate-400 border-t-transparent rounded-full mr-2"></div>
-                        AI is thinking...
+                        {/* Typing indicator */}
+                        {processing && (
+                            <div className="flex justify-start">
+                                <div className="bg-white text-slate-800 border border-slate-200 p-4 rounded-2xl shadow-md">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="flex space-x-1">
+                                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                        </div>
+                                        <span className="text-sm text-slate-500">AI is thinking...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
-                
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* 👇 SỬA: Controls - STICKY BOTTOM (giống Practice Interview) */}
+            {/* 👇 SỬA: Controls - STICKY BOTTOM */}
             <div className="bg-white border-t p-4 shadow-lg flex-shrink-0 sticky bottom-0 z-10">
                 <div className="max-w-3xl mx-auto flex flex-col items-center gap-3">
                     {/* Mode Toggle */}
                     <div className="w-full flex justify-center gap-2 mb-2">
                         <button
-                            onClick={() => setInputMode('voice')}
+                            onClick={() => {
+                                setInputMode('voice');
+                                if (listening) {
+                                    SpeechRecognition.stopListening();
+                                    resetTranscript();
+                                }
+                            }}
                             className={`px-4 py-2 rounded-lg font-semibold transition ${
                                 inputMode === 'voice' 
                                 ? 'bg-blue-600 text-white' 
@@ -316,7 +256,13 @@ const InterviewRoom = () => {
                             🎤 Voice
                         </button>
                         <button
-                            onClick={() => setInputMode('text')}
+                            onClick={() => {
+                                setInputMode('text');
+                                if (listening) {
+                                    SpeechRecognition.stopListening();
+                                    resetTranscript();
+                                }
+                            }}
                             className={`px-4 py-2 rounded-lg font-semibold transition ${
                                 inputMode === 'text' 
                                 ? 'bg-blue-600 text-white' 
@@ -330,13 +276,19 @@ const InterviewRoom = () => {
                     {/* Input Area */}
                     {inputMode === 'voice' ? (
                         <div className="w-full p-3 bg-slate-50 rounded-lg border border-slate-200 min-h-[60px] text-slate-700">
-                            {listening && (
+                            {listening ? (
                                 <div className="text-sm text-blue-600 mb-2 font-semibold animate-pulse flex items-center">
                                     <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-ping"></div>
                                     Recording... Speak clearly
                                 </div>
+                            ) : (
+                                <div className="text-sm text-slate-400 mb-2">
+                                    Press "Start Speaking" when you're ready
+                                </div>
                             )}
-                            {transcript || "Press 'Start Speaking' to begin..."}
+                            <div className="text-slate-700">
+                                {transcript || "Your speech will appear here..."}
+                            </div>
                         </div>
                     ) : (
                         <textarea
@@ -348,32 +300,36 @@ const InterviewRoom = () => {
                             disabled={processing}
                         />
                     )}
-                    
+
                     {/* Action Buttons */}
                     <div className="flex gap-3 w-full justify-center">
                         {inputMode === 'voice' ? (
-                            <button 
-                                onClick={listening ? handleSend : handleStartSpeaking}
-                                disabled={processing}
-                                className={`px-6 py-2.5 rounded-full font-bold text-white transition-all shadow-lg flex items-center gap-2 ${
-                                    listening 
-                                    ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                                    : processing
-                                    ? 'bg-gray-400 cursor-not-allowed'
-                                    : 'bg-blue-600 hover:bg-blue-700'
-                                }`}
-                            >
-                                {listening ? (
-                                    <>⏹ Stop & Send</>
-                                ) : processing ? (
-                                    <>⏳ Processing...</>
+                            <>
+                                {!listening ? (
+                                    <button 
+                                        onClick={handleStartSpeaking}
+                                        disabled={processing}
+                                        className={`px-6 py-2.5 rounded-full font-bold text-white transition-all shadow-lg flex items-center gap-2 ${
+                                            processing
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-blue-600 hover:bg-blue-700'
+                                        }`}
+                                    >
+                                        🎤 Start Speaking
+                                    </button>
                                 ) : (
-                                    <>🎤 Start Speaking</>
+                                    <button 
+                                        onClick={handleStopAndSend}
+                                        disabled={processing}
+                                        className="px-6 py-2.5 rounded-full font-bold text-white bg-red-500 hover:bg-red-600 transition-all shadow-lg flex items-center gap-2 animate-pulse"
+                                    >
+                                        ⏹ Stop & Send
+                                    </button>
                                 )}
-                            </button>
+                            </>
                         ) : (
                             <button
-                                onClick={handleSend}
+                                onClick={handleSendText}
                                 disabled={processing || !textInput.trim()}
                                 className={`px-6 py-2.5 rounded-full font-bold text-white transition-all shadow-lg flex items-center gap-2 ${
                                     processing || !textInput.trim()
@@ -398,4 +354,4 @@ const InterviewRoom = () => {
     );
 };
 
-export default InterviewRoom;
+export default PracticeInterviewRoom;

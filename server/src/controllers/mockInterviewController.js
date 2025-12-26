@@ -1,5 +1,7 @@
 const db = require('../config/database');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -211,43 +213,55 @@ const processResponse = async (req, res) => {
         const chat = model.startChat({
             history: history,
             generationConfig: {
-                maxOutputTokens: 500, // ← TĂNG TỪ 300
+                maxOutputTokens: 1024, // 👈 SỬA: TĂNG TỪ 500 LÊN 1024
                 temperature: 0.7,
-                stopSequences: [] // ← Không có stop sequence
+                topP: 0.95, // 👈 THÊM: Cải thiện chất lượng response
+                topK: 40,   // 👈 THÊM: Tránh response lặp lại
+                stopSequences: [] // Không có stop sequence
             }
         });
 
         console.log('📤 Sending message to Gemini:', userText.substring(0, 50) + '...');
-        
+
+        // 👇 SỬA: TĂNG TIMEOUT TỪ 20s LÊN 30s
         const result = await withTimeout(
             chat.sendMessage(userText + additionalInstruction),
-            20000 // ← Timeout 20 giây
+            30000 // ← Timeout 30 giây
         );
         
         let aiResponse = result.response.text().trim();
         
         console.log('✅ Raw AI Response:', aiResponse);
+        console.log('📏 Response length:', aiResponse.length, 'characters');
         
-        // Kiểm tra response bị cắt ngang
-        const truncatedEndings = ['However', 'But', 'And', 'Therefore', ',', ';'];
-        const lastWord = aiResponse.split(' ').pop();
+        // 👇 SỬA: KIỂM TRA response bị cắt CHẶT CHẼ HƠN
+        const lastSentence = aiResponse.split('.').pop().trim();
+        const endsWithIncompleteWord = aiResponse.match(/[a-z]+-\s*$/); // Kiểm tra từ bị cắt (vd: "trade-")
+        const isTooShort = aiResponse.length < 40;
         
-        if (truncatedEndings.includes(lastWord) || aiResponse.length < 30) {
-            console.warn('⚠️ Response seems truncated, retrying with continuation prompt...');
+        if (endsWithIncompleteWord || isTooShort || !aiResponse.endsWith('.') && !aiResponse.endsWith('?') && !aiResponse.endsWith('!')) {
+            console.warn('⚠️ Response seems truncated, requesting continuation...');
             
             try {
-                const continuePrompt = '[SYSTEM: Your previous response was incomplete. Continue from where you left off and complete your full thought.]';
+                const continuePrompt = '[SYSTEM: Your previous response was incomplete. Continue from where you left off and complete your full thought. End with a complete sentence.]';
                 const retryResult = await withTimeout(
                     chat.sendMessage(continuePrompt),
-                    15000
+                    20000
                 );
                 const continuation = retryResult.response.text().trim();
+                
+                // Xóa dấu gạch ngang ở cuối response cũ nếu có
+                if (endsWithIncompleteWord) {
+                    aiResponse = aiResponse.replace(/-\s*$/, '');
+                }
+                
                 aiResponse = aiResponse + ' ' + continuation;
                 console.log('✅ Continued Response:', continuation);
+                console.log('📏 Final response length:', aiResponse.length);
             } catch (retryError) {
                 console.error('❌ Retry failed:', retryError.message);
-                // Nếu retry thất bại, thêm ending mặc định
-                aiResponse += ' Could you elaborate on that?';
+                // Nếu retry thất bại, thêm ending tạm thời
+                aiResponse += ' Could you elaborate more on that?';
             }
         }
 
@@ -258,6 +272,12 @@ const processResponse = async (req, res) => {
             { role: 'model', parts: [{ text: aiResponse }] }
         ];
 
+        // 👇 THÊM LOG
+        console.log('📊 Chat history updated:');
+        console.log('  - Total messages:', newHistory.length);
+        console.log('  - User messages:', newHistory.filter(m => m.role === 'user').length);
+        console.log('  - Model messages:', newHistory.filter(m => m.role === 'model').length);
+
         // Cập nhật metrics
         const currentMetrics = session.audio_metrics || { hesitations: 0, wpm_history: [] };
         if (audioStats) {
@@ -267,14 +287,22 @@ const processResponse = async (req, res) => {
             }
         }
 
+        // Cập nhật database
         await db.query(
-            'UPDATE mock_interviews SET chat_history = $1, audio_metrics = $2 WHERE session_id = $3',
-            [JSON.stringify(newHistory), JSON.stringify(currentMetrics), sessionId]
+            'UPDATE mock_interviews SET chat_history = $1 WHERE session_id = $2',
+            [JSON.stringify(newHistory), sessionId]
         );
+
+        // 👇 THÊM LOG
+        console.log('✅ Response sent to client:', {
+            responseLength: aiResponse.length,
+            questionsAsked: questionsAsked + 1,
+            isComplete: aiResponse.endsWith('.') || aiResponse.endsWith('?') || aiResponse.endsWith('!')
+        });
 
         res.json({ 
             message: aiResponse,
-            questionsAsked: questionsAsked + 1 // ← Trả về số câu hỏi hiện tại
+            questionsAsked: questionsAsked + 1
         });
     } catch (error) {
         console.error('❌ Process Response Error:', error);
@@ -353,4 +381,152 @@ Return ONLY the JSON, no markdown.`;
     }
 };
 
-module.exports = { startSession, processResponse, endSession };
+// 👇 THÊM HÀM: Extract text từ CV buffer
+const extractTextFromCV = async (file) => {
+    const buffer = file.buffer;
+    const { mimetype } = file;
+    
+    if (mimetype === 'text/plain') {
+        return buffer.toString('utf-8');
+    } else if (mimetype === 'application/pdf') {
+        const pdfData = await pdfParse(buffer);
+        return pdfData.text;
+    } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const result = await mammoth.extractRawText({ buffer });
+        return result.value;
+    }
+    throw new Error('Unsupported file type');
+};
+
+// 👇 HÀM MỚI: Start Practice Interview
+const startPracticeSession = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { jobDescription, interviewType } = req.body;
+        const cvFile = req.file;
+
+        if (!cvFile) {
+            return res.status(400).json({ error: 'CV file is required' });
+        }
+
+        if (!jobDescription || !jobDescription.trim()) {
+            return res.status(400).json({ error: 'Job description is required' });
+        }
+
+        const type = interviewType || 'HR';
+
+        console.log(`🎤 Starting practice interview for user ${userId}, type: ${type}`);
+
+        // Extract CV text
+        const cvText = await extractTextFromCV(cvFile);
+        console.log(`✅ CV extracted: ${cvText.substring(0, 100)}...`);
+
+        // Get candidate name
+        const userRes = await db.query('SELECT full_name FROM users WHERE id = $1', [userId]);
+        const candidateName = userRes.rows[0]?.full_name || 'Candidate';
+
+        // Tạo session (không cần job_id, dùng -1 hoặc NULL)
+        const insertRes = await db.query(
+            `INSERT INTO mock_interviews (user_id, job_id, interview_type, chat_history, cv_text, job_description) 
+             VALUES ($1, NULL, $2, $3, $4, $5) RETURNING session_id`,
+            [userId, type, JSON.stringify([]), cvText, jobDescription]
+        );
+        const sessionId = insertRes.rows[0].session_id;
+
+        console.log(`✅ Session created: ${sessionId}`);
+
+        // Gọi Gemini để tạo câu hỏi đầu tiên
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        
+        const interviewerRole = type === 'HR' ? 'an HR interviewer' : 'a Tech Lead';
+
+        let focusArea = '';
+        if (type === 'Tech_Lead') {
+            focusArea = `
+TECHNICAL FOCUS:
+- System design and architecture decisions
+- Code quality, testing strategies, and CI/CD
+- Scalability and performance optimization
+- Technical trade-offs in projects mentioned in CV
+- Deep dive into projects listed in CV
+`;
+        } else {
+            focusArea = `
+HR FOCUS:
+- Behavioral questions using STAR method (Situation, Task, Action, Result)
+- Teamwork, conflict resolution, and communication skills
+- Motivation, career goals, and cultural fit
+- Work-life balance and stress management
+- Projects and experience from CV
+`;
+        }
+
+        const systemPrompt = `You are a professional ${type} interviewer conducting a practice interview.
+
+CANDIDATE CV SUMMARY (first 600 chars):
+${cvText.substring(0, 600)}
+
+JOB DESCRIPTION (first 600 chars):
+${jobDescription.substring(0, 600)}
+
+${focusArea}
+
+INTERVIEW STRUCTURE:
+1. Introduce yourself: "Hello ${candidateName}, I'm ${interviewerRole}. Let's start this practice interview."
+2. Ask ONE clear, specific question related to:
+   - Their CV (projects, experience, skills)
+   - The job description requirements
+3. Keep your responses under 2 sentences.
+4. Ask a total of 5 questions, then politely end the interview.
+
+IMPORTANT RULES:
+- If the candidate's answer is incomplete or too short, politely ask them to elaborate.
+- After receiving a satisfactory answer, immediately ask the next question.
+- Do NOT repeat the same question.
+- Do NOT ask more than 5 questions total.
+- Focus on their CV and how it relates to the job description.
+
+START now with your introduction and Question 1.`;
+
+        console.log("📤 Sending request to Gemini API...");
+
+        const result = await withTimeout(
+            model.generateContent(systemPrompt),
+            30000
+        );
+
+        const firstQuestion = result.response.text();
+        console.log("✅ Gemini response received:", firstQuestion.substring(0, 100) + '...');
+
+        const initialHistory = [
+            { role: 'user', parts: [{ text: 'Start the interview' }] },
+            { role: 'model', parts: [{ text: firstQuestion }] }
+        ];
+
+        await db.query('UPDATE mock_interviews SET chat_history = $1 WHERE session_id = $2', 
+            [JSON.stringify(initialHistory), sessionId]);
+
+        const responseData = { 
+            sessionId, 
+            message: firstQuestion
+        };
+
+        console.log("📤 Sending response to client");
+
+        res.json(responseData);
+
+    } catch (error) {
+        console.error('❌ Start Practice Session Error:', error.message);
+        res.status(500).json({ 
+            error: 'Failed to start practice interview', 
+            details: error.message 
+        });
+    }
+};
+
+module.exports = { 
+    startSession, 
+    processResponse, 
+    endSession,
+    startPracticeSession // 👈 EXPORT HÀM MỚI
+};

@@ -76,6 +76,10 @@ const JobDetail = () => {
     const [aiSuggestions, setAiSuggestions] = useState(null);
     const [analyzing, setAnalyzing] = useState(false);
 
+    // 👇 THÊM: Favorite state
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [favoriteLoading, setFavoriteLoading] = useState(false);
+
     // 👇 THÊM HÀM formatSalary Ở ĐÂY
     const formatSalary = (job) => {
         // 1. Ưu tiên hiển thị salary_range (chuỗi) nếu có
@@ -108,6 +112,7 @@ const JobDetail = () => {
 
                 if (isAuthenticated && isCandidate) {
                     checkApplicationStatus(id);
+                    checkFavoriteStatus(id); // 👈 THÊM
                 }
 
             } catch (err) {
@@ -124,6 +129,16 @@ const JobDetail = () => {
                 setHasApplied(checkRes.data.hasApplied);
             } catch (err) {
                 console.warn("Application check failed (ignoring):", err.message);
+            }
+        };
+
+        // 👇 THÊM HÀM: Kiểm tra favorite status
+        const checkFavoriteStatus = async (jobId) => {
+            try {
+                const checkRes = await api.get(`/favorites/check/${jobId}`);
+                setIsFavorite(checkRes.data.isFavorite);
+            } catch (err) {
+                console.warn("Favorite check failed (ignoring):", err.message);
             }
         };
 
@@ -202,6 +217,27 @@ const JobDetail = () => {
         }
     };
 
+    // 👇 THÊM HÀM: Toggle favorite
+    const handleToggleFavorite = async () => {
+        if (!isAuthenticated || !isCandidate) return;
+        
+        setFavoriteLoading(true);
+        try {
+            if (isFavorite) {
+                await api.delete(`/favorites/remove/${id}`);
+                setIsFavorite(false);
+            } else {
+                await api.post('/favorites/add', { job_id: id });
+                setIsFavorite(true);
+            }
+        } catch (err) {
+            console.error('Error toggling favorite:', err);
+            alert('Failed to update favorite status');
+        } finally {
+            setFavoriteLoading(false);
+        }
+    };
+
     // Helper for progress bar color
     const getScoreColor = (score) => {
         if (score >= 80) return 'bg-green-500';
@@ -239,10 +275,10 @@ const JobDetail = () => {
                 <div className="lg:col-span-2 space-y-8">
                     <div className="bg-white rounded-2xl p-8 shadow-soft border border-slate-100">
                         <div className="flex items-start justify-between gap-4 mb-6">
-                            <div>
+                            <div className="flex-1">
                                 <h1 className="text-3xl font-bold text-slate-900 mb-2">{job.title}</h1>
                                 <div className="flex items-center gap-3">
-                                    {/* 👇 SỬA: Dùng avatar_url trực tiếp */}
+                                    {/* Avatar */}
                                     <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
                                         {job.avatar_url ? (
                                             <img 
@@ -270,14 +306,45 @@ const JobDetail = () => {
                                     </div>
                                 </div>
                             </div>
-                            {hasApplied && (
-                                <span className="px-4 py-2 bg-green-50 text-green-700 rounded-lg font-bold text-sm border border-green-100 flex items-center">
-                                    <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                    Applied
-                                </span>
-                            )}
+
+                            {/* 👇 SỬA: Di chuyển "APPLIED" badge ra đây (bên trái nút Favorite) */}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                                {/* Badge "APPLIED" */}
+                                {isAuthenticated && isCandidate && hasApplied && (
+                                    <span className="px-3 py-1.5 rounded-lg bg-green-100 text-green-700 text-sm font-bold flex items-center border-2 border-green-200 shadow-sm animate-fade-in">
+                                        <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        APPLIED
+                                    </span>
+                                )}
+
+                                {/* Favorite Button */}
+                                {isAuthenticated && isCandidate && (
+                                    <button
+                                        onClick={handleToggleFavorite}
+                                        disabled={favoriteLoading}
+                                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
+                                            isFavorite 
+                                                ? 'bg-red-50 text-red-600 hover:bg-red-100 border-2 border-red-200' 
+                                                : 'bg-slate-100 text-slate-400 hover:bg-slate-200 border-2 border-slate-200'
+                                        } ${favoriteLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                    >
+                                        {favoriteLoading ? (
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                                        ) : (
+                                            <svg className="w-6 h-6" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
+                        {/* 👇 XÓA BADGE "APPLIED" Ở ĐÂY (vì đã di chuyển lên trên) */}
+                        {/* Job Info Badges */}
                         <div className="flex flex-wrap gap-3 mb-8">
                             <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-sm font-medium flex items-center">
                                 💼 {job.employment_type}
@@ -286,20 +353,23 @@ const JobDetail = () => {
                                 💰 {formatSalary(job)}
                             </span>
                             
-                            {/* 👇 HIỂN THỊ SỐ LƯỢNG APPLY */}
+                            {/* Số lượng apply */}
                             <span className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-sm font-medium flex items-center">
                                 👥 {job.application_count || 0} Applicants
                             </span>
 
-                            {/* 👇 HIỂN THỊ DEADLINE */}
+                            {/* Deadline */}
                             {job.deadline && (
                                 <span className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center ${isExpired ? 'bg-red-100 text-red-700' : 'bg-orange-50 text-orange-700'}`}>
                                     ⏰ Deadline: {new Date(job.deadline).toLocaleDateString()}
                                     {isExpired && ' (Expired)'}
                                 </span>
                             )}
+
+                            {/* 👈 XÓA BADGE "APPLIED" Ở ĐÂY */}
                         </div>
 
+                        {/* Job Description */}
                         <div className="prose prose-slate max-w-none">
                             <h3 className="text-lg font-bold text-slate-900 mb-3">Job Description</h3>
                             <div className="text-slate-600 leading-relaxed whitespace-pre-line">

@@ -1,260 +1,219 @@
 const db = require('../config/database');
+const { createNotification } = require('./notificationController');
 
-// Employer gửi lời mời phỏng vấn
+// Send Interview Invitation
 const sendInterviewInvitation = async (req, res) => {
-    const { applicationId, timeSlots, location, meetingLink, notes, duration } = req.body;
-    const employer_id = req.user.id;
-
     try {
-        // Kiểm tra application có thuộc về employer không
-        const appCheck = await db.query(`
-            SELECT a.id, a.job_id, a.candidate_id, a.status,
-                   j.title as job_title,
-                   u.email as candidate_email, u.full_name as candidate_name
-            FROM applications a
-            JOIN jobs j ON a.job_id = j.id
-            JOIN users u ON a.candidate_id = u.id
-            WHERE a.id = $1 AND j.employer_id = $2
-        `, [applicationId, employer_id]);
+        const employerId = req.user.id;
+        const { applicationId, slots } = req.body;
 
-        if (appCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'Application not found' });
+        if (!applicationId || !slots || !Array.isArray(slots) || slots.length === 0) {
+            return res.status(400).json({ error: 'applicationId and slots are required' });
         }
 
-        const application = appCheck.rows[0];
+        // Check if application exists
+        const applicationCheck = await db.query(
+            `SELECT a.id, a.candidate_id, a.job_id, j.title, j.employer_id, u.company_name
+             FROM applications a
+             JOIN jobs j ON a.job_id = j.id
+             JOIN users u ON j.employer_id = u.id
+             WHERE a.id = $1 AND j.employer_id = $2`,
+            [applicationId, employerId]
+        );
 
-        // Kiểm tra đã có interview chưa
+        if (applicationCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Application not found or unauthorized' });
+        }
+
+        const { candidate_id: candidateId, job_id: jobId, title: jobTitle, company_name: companyName } = applicationCheck.rows[0];
+
+        // Check if already sent
         const existingInterview = await db.query(
             'SELECT id FROM interviews WHERE application_id = $1',
             [applicationId]
         );
 
-        let interviewId;
-
         if (existingInterview.rows.length > 0) {
-            // Update interview cũ
-            interviewId = existingInterview.rows[0].id;
-            await db.query(`
-                UPDATE interviews 
-                SET location = $1, meeting_link = $2, notes = $3, 
-                    duration_minutes = $4, status = 'pending', updated_at = CURRENT_TIMESTAMP
-                WHERE id = $5
-            `, [location, meetingLink, notes, duration || 60, interviewId]);
-
-            // Xóa time slots cũ
-            await db.query('DELETE FROM interview_time_slots WHERE interview_id = $1', [interviewId]);
-        } else {
-            // Tạo interview mới
-            const interviewResult = await db.query(`
-                INSERT INTO interviews 
-                (application_id, job_id, employer_id, candidate_id, location, meeting_link, notes, duration_minutes, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending')
-                RETURNING id
-            `, [
-                applicationId,
-                application.job_id,
-                employer_id,
-                application.candidate_id,
-                location,
-                meetingLink,
-                notes,
-                duration || 60
-            ]);
-
-            interviewId = interviewResult.rows[0].id;
+            return res.status(400).json({ error: 'Interview invitation already sent' });
         }
 
-        // Thêm time slots mới
-        if (timeSlots && timeSlots.length > 0) {
-            for (const slot of timeSlots) {
-                await db.query(
-                    'INSERT INTO interview_time_slots (interview_id, slot_date) VALUES ($1, $2)',
-                    [interviewId, slot]
-                );
-            }
-        }
+        // Insert interview
+        const result = await db.query(
+            `INSERT INTO interviews (application_id, job_id, employer_id, candidate_id, status, proposed_slots)
+             VALUES ($1, $2, $3, $4, 'pending', $5)
+             RETURNING id`,
+            [applicationId, jobId, employerId, candidateId, JSON.stringify(slots)]
+        );
+
+        const interviewId = result.rows[0].id;
 
         // Update application status
         await db.query(
-            "UPDATE applications SET status = 'interview_scheduled' WHERE id = $1",
-            [applicationId]
+            'UPDATE applications SET status = $1 WHERE id = $2',
+            ['interview_scheduled', applicationId]
         );
 
-        res.json({
-            success: true,
-            message: 'Interview invitation sent',
-            interviewId,
-            candidateEmail: application.candidate_email,
-            candidateName: application.candidate_name
-        });
+        // Create notification
+        await createNotification(
+            candidateId,
+            'interview_invite',
+            '📅 Interview Invitation',
+            `You have been invited for an interview for ${jobTitle} at ${companyName}`,
+            `/interview/schedule/${applicationId}`
+        );
 
+        res.json({ 
+            message: 'Interview invitation sent',
+            interviewId 
+        });
     } catch (error) {
-        console.error('Error sending interview invitation:', error);
-        res.status(500).json({ error: 'Failed to send invitation' });
+        console.error('Send invitation error:', error);
+        res.status(500).json({ error: 'Failed to send interview invitation' });
     }
 };
 
-// Candidate xem chi tiết interview
-const getInterviewDetails = async (req, res) => {
-    const { applicationId } = req.params;
-    const candidate_id = req.user.id;
-
+// Confirm Interview Slot
+const confirmInterviewSlot = async (req, res) => {
     try {
-        const result = await db.query(`
-            SELECT 
-                i.id, i.interview_date, i.duration_minutes, i.location, 
-                i.meeting_link, i.notes, i.status, i.created_at,
-                j.title as job_title,
-                e.company_name, e.email as employer_email
-            FROM interviews i
-            JOIN jobs j ON i.job_id = j.id
-            JOIN users e ON i.employer_id = e.id
-            WHERE i.application_id = $1 AND i.candidate_id = $2
-        `, [applicationId, candidate_id]);
+        const { applicationId } = req.params;
+        const { slotId } = req.body;
+        const candidateId = req.user.id;
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Interview not found' });
+        if (!slotId) {
+            return res.status(400).json({ error: 'slotId is required' });
         }
 
-        const interview = result.rows[0];
-
-        // Lấy time slots
-        const slotsResult = await db.query(`
-            SELECT id, slot_date, is_selected
-            FROM interview_time_slots
-            WHERE interview_id = $1
-            ORDER BY slot_date ASC
-        `, [interview.id]);
-
-        interview.timeSlots = slotsResult.rows;
-
-        res.json({ interview });
-
-    } catch (error) {
-        console.error('Error fetching interview:', error);
-        res.status(500).json({ error: 'Failed to fetch interview' });
-    }
-};
-
-// Candidate xác nhận thời gian phỏng vấn
-const confirmInterviewSlot = async (req, res) => {
-    const { interviewId, slotId } = req.body;
-    const candidate_id = req.user.id;
-
-    try {
-        // Verify interview thuộc về candidate
+        // Get interview
         const interviewCheck = await db.query(
-            'SELECT id, application_id FROM interviews WHERE id = $1 AND candidate_id = $2',
-            [interviewId, candidate_id]
+            `SELECT i.id, i.proposed_slots, i.employer_id, i.job_id, j.title, u.company_name, u2.full_name as candidate_name
+             FROM interviews i
+             JOIN jobs j ON i.job_id = j.id
+             JOIN users u ON i.employer_id = u.id
+             JOIN users u2 ON i.candidate_id = u2.id
+             WHERE i.application_id = $1 AND i.candidate_id = $2`,
+            [applicationId, candidateId]
         );
 
         if (interviewCheck.rows.length === 0) {
-            return res.status(404).json({ error: 'Interview not found' });
+            return res.status(404).json({ error: 'Interview not found or unauthorized' });
         }
 
-        // Lấy thời gian của slot được chọn
-        const slotResult = await db.query(
-            'SELECT slot_date FROM interview_time_slots WHERE id = $1 AND interview_id = $2',
-            [slotId, interviewId]
-        );
+        const interview = interviewCheck.rows[0];
+        const slots = interview.proposed_slots;
+        const selectedSlot = slots.find(s => s.id === slotId);
 
-        if (slotResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Time slot not found' });
+        if (!selectedSlot) {
+            return res.status(400).json({ error: 'Invalid slot ID' });
         }
-
-        const selectedDate = slotResult.rows[0].slot_date;
 
         // Update interview
-        await db.query(`
-            UPDATE interviews 
-            SET interview_date = $1, status = 'confirmed', confirmed_at = CURRENT_TIMESTAMP
-            WHERE id = $2
-        `, [selectedDate, interviewId]);
-
-        // Đánh dấu slot được chọn
         await db.query(
-            'UPDATE interview_time_slots SET is_selected = TRUE WHERE id = $1',
-            [slotId]
+            `UPDATE interviews 
+             SET confirmed_slot = $1, status = 'confirmed', updated_at = CURRENT_TIMESTAMP
+             WHERE application_id = $2`,
+            [JSON.stringify(selectedSlot), applicationId]
         );
 
         // Update application status
-        const applicationId = interviewCheck.rows[0].application_id;
         await db.query(
-            "UPDATE applications SET status = 'interview_confirmed' WHERE id = $1",
-            [applicationId]
+            'UPDATE applications SET status = $1 WHERE id = $2',
+            ['interview_confirmed', applicationId]
         );
 
-        res.json({
-            success: true,
-            message: 'Interview confirmed',
-            interviewDate: selectedDate
-        });
+        // Notification for employer
+        await createNotification(
+            interview.employer_id,
+            'interview_confirmed',
+            '✅ Interview Confirmed',
+            `${interview.candidate_name} has confirmed interview for ${interview.title}`,
+            `/employer/jobs/${interview.job_id}/applications`
+        );
 
+        // Notification for candidate
+        await createNotification(
+            candidateId,
+            'interview_confirmed',
+            '✅ Interview Confirmed',
+            `Your interview for ${interview.title} has been confirmed`,
+            `/my-interviews`
+        );
+
+        res.json({ message: 'Interview time confirmed' });
     } catch (error) {
-        console.error('Error confirming interview:', error);
+        console.error('Confirm interview error:', error);
         res.status(500).json({ error: 'Failed to confirm interview' });
     }
 };
 
-// Lấy danh sách interviews của employer
-const getEmployerInterviews = async (req, res) => {
-    const employer_id = req.user.id;
-
+// Get candidate's interviews
+const getCandidateInterviews = async (req, res) => {
     try {
-        const result = await db.query(`
-            SELECT 
-                i.id, i.interview_date, i.status, i.location, i.duration_minutes,
+        const candidateId = req.user.id;
+
+        const result = await db.query(
+            `SELECT 
+                i.id,
+                i.application_id,
+                i.status,
+                i.proposed_slots,
+                i.confirmed_slot,
+                i.created_at,
+                j.id as job_id,
                 j.title as job_title,
-                u.full_name as candidate_name, u.email as candidate_email,
-                a.id as application_id
-            FROM interviews i
-            JOIN jobs j ON i.job_id = j.id
-            JOIN users u ON i.candidate_id = u.id
-            JOIN applications a ON i.application_id = a.id
-            WHERE i.employer_id = $1
-            ORDER BY i.interview_date DESC NULLS LAST, i.created_at DESC
-        `, [employer_id]);
+                j.location,
+                u.company_name,
+                u.avatar_url
+             FROM interviews i
+             JOIN jobs j ON i.job_id = j.id
+             JOIN users u ON i.employer_id = u.id
+             WHERE i.candidate_id = $1
+             ORDER BY i.created_at DESC`,
+            [candidateId]
+        );
 
         res.json({ interviews: result.rows });
-
     } catch (error) {
-        console.error('Error fetching interviews:', error);
-        res.status(500).json({ error: 'Failed to fetch interviews' });
+        console.error('Get candidate interviews error:', error);
+        res.status(500).json({ error: 'Failed to get interviews' });
     }
 };
 
-// Lấy danh sách interviews của candidate
-const getCandidateInterviews = async (req, res) => {
-    const candidate_id = req.user.id;
-
+// Get employer's interviews
+const getEmployerInterviews = async (req, res) => {
     try {
-        const result = await db.query(`
-            SELECT 
-                i.id, i.interview_date, i.status, i.location, i.duration_minutes,
-                i.meeting_link, i.notes,
+        const employerId = req.user.id;
+
+        const result = await db.query(
+            `SELECT 
+                i.id,
+                i.application_id,
+                i.status,
+                i.proposed_slots,
+                i.confirmed_slot,
+                i.created_at,
+                j.id as job_id,
                 j.title as job_title,
-                e.company_name, e.email as employer_email,
-                a.id as application_id
-            FROM interviews i
-            JOIN jobs j ON i.job_id = j.id
-            JOIN users e ON i.employer_id = e.id
-            JOIN applications a ON i.application_id = a.id
-            WHERE i.candidate_id = $1
-            ORDER BY i.interview_date ASC NULLS LAST, i.created_at DESC
-        `, [candidate_id]);
+                u.full_name as candidate_name,
+                u.email as candidate_email,
+                u.avatar_url as candidate_avatar
+             FROM interviews i
+             JOIN jobs j ON i.job_id = j.id
+             JOIN users u ON i.candidate_id = u.id
+             WHERE i.employer_id = $1
+             ORDER BY i.created_at DESC`,
+            [employerId]
+        );
 
         res.json({ interviews: result.rows });
-
     } catch (error) {
-        console.error('Error fetching interviews:', error);
-        res.status(500).json({ error: 'Failed to fetch interviews' });
+        console.error('Get employer interviews error:', error);
+        res.status(500).json({ error: 'Failed to get interviews' });
     }
 };
 
 module.exports = {
     sendInterviewInvitation,
-    getInterviewDetails,
     confirmInterviewSlot,
-    getEmployerInterviews,
-    getCandidateInterviews
+    getCandidateInterviews,
+    getEmployerInterviews
 };

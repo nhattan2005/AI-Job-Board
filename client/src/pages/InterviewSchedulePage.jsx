@@ -26,7 +26,8 @@ const InterviewSchedulePage = () => {
     const fetchInterviewDetails = async () => {
         try {
             setLoading(true);
-            const response = await api.get(`/interviews/application/${applicationId}`);
+            // 👇 SỬA: Đổi /interviews thành /interview
+            const response = await api.get(`/interview/application/${applicationId}`);
             setInterview(response.data.interview);
             
             const confirmedSlot = response.data.interview.timeSlots.find(s => s.is_selected);
@@ -51,14 +52,14 @@ const InterviewSchedulePage = () => {
         setError(null);
 
         try {
-            await api.post('/interviews/confirm', {
+            // 👇 SỬA: Đổi /interviews thành /interview
+            await api.post('/interview/confirm', {
                 interviewId: interview.id,
                 slotId: selectedSlotId
             });
 
             setSuccess(true);
             
-            // 👇 ĐẢM BẢO DÒNG NÀY CHUYỂN VỀ /my-interviews
             setTimeout(() => {
                 navigate('/my-interviews');
             }, 2000);

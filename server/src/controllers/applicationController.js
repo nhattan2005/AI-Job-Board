@@ -1,10 +1,8 @@
-const multer = require('multer');
-const pdfParse = require('pdf-parse');
-const mammoth = require('mammoth');
 const db = require('../config/database');
-const { embedCV } = require('../services/embeddingService');
-const { cloudinary } = require('../config/cloudinary');
-const streamifier = require('streamifier');
+const { extractTextFromFile } = require('../utils/pdfExtractor');
+const { uploadToCloudinary } = require('../services/cloudinaryService');
+const multer = require('multer');
+const { createNotification } = require('./notificationController'); // 👈 THÊM IMPORT
 
 // 👇 DÙNG MEMORY STORAGE (Lưu vào RAM trước)
 const storage = multer.memoryStorage();
@@ -26,54 +24,7 @@ const upload = multer({
     }
 });
 
-// 👇 HELPER: Upload Buffer lên Cloudinary
-const uploadToCloudinary = (buffer, filename, userId) => {
-    return new Promise((resolve, reject) => {
-        // 👇 THÊM: Lấy extension từ filename
-        const extension = filename.split('.').pop().toLowerCase();
-        const filenameWithoutExt = filename.split('.').slice(0, -1).join('.').replace(/[^a-zA-Z0-9]/g, '_');
-        
-        const uploadStream = cloudinary.uploader.upload_stream(
-            { 
-                folder: 'ai-job-board/cvs',
-                resource_type: 'raw',
-                public_id: `cv_${userId}_${filenameWithoutExt}_${Date.now()}`,
-                // 👇 THÊM: Format để Cloudinary biết đây là file gì
-                format: extension,
-                use_filename: false // Để public_id tự động thêm extension
-            },
-            (error, result) => {
-                if (error) {
-                    console.error('❌ Cloudinary upload error:', error);
-                    reject(error);
-                } else {
-                    console.log('✅ CV uploaded to Cloudinary:', result.secure_url);
-                    resolve(result);
-                }
-            }
-        );
-        streamifier.createReadStream(buffer).pipe(uploadStream);
-    });
-};
-
-// 👇 HELPER: Extract text từ Buffer
-const extractTextFromFile = async (file) => {
-    const buffer = file.buffer;
-    const { mimetype } = file;
-    
-    if (mimetype === 'text/plain') {
-        return buffer.toString('utf-8');
-    } else if (mimetype === 'application/pdf') {
-        const pdfData = await pdfParse(buffer);
-        return pdfData.text;
-    } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        const result = await mammoth.extractRawText({ buffer });
-        return result.value;
-    }
-    throw new Error('Unsupported file type');
-};
-
-// 👇 HÀM APPLY JOB (CẬP NHẬT)
+// Apply for a job
 const applyForJob = async (req, res) => {
     try {
         if (!req.file) {
@@ -94,37 +45,47 @@ const applyForJob = async (req, res) => {
 
         // 2. Upload file lên Cloudinary
         const cloudResult = await uploadToCloudinary(req.file.buffer, req.file.originalname, candidate_id);
-        const filePath = cloudResult.secure_url; // 👈 URL từ Cloudinary
+        const filePath = cloudResult.secure_url;
         console.log('✅ CV file uploaded to Cloudinary:', filePath);
 
-        // 3. Generate embedding
-        console.log('🔄 Generating embedding...');
-        const cvVector = await embedCV(cvText);
-        console.log('✅ Embedding generated');
+        // 3. Lấy thông tin job (để kiểm tra)
+        const jobResult = await db.query('SELECT id, title, description FROM jobs WHERE id = $1', [job_id]);
+        if (jobResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Job not found' });
+        }
+        const job = jobResult.rows[0];
+        console.log('✅ Job found:', job.title);
 
-        // 4. Lưu vào database (UPSERT)
-        const cvResult = await db.query(
-            `INSERT INTO cvs (candidate_id, filename, cv_text, vector, file_path) 
-             VALUES ($1, $2, $3, $4, $5) 
-             ON CONFLICT (candidate_id) 
-             DO UPDATE SET 
-                filename = $2, 
-                cv_text = $3, 
-                vector = $4, 
-                file_path = $5, 
-                created_at = CURRENT_TIMESTAMP
-             RETURNING id`,
-            [
-                candidate_id, 
-                req.file.originalname, // 👈 ĐẢM BẢO GIỮ NGUYÊN FILENAME GỐC (có .pdf, .docx)
-                cvText, 
-                JSON.stringify(cvVector), 
-                filePath
-            ]
+        // 👇 4. KIỂM TRA CV ĐÃ TỒN TẠI CHƯA
+        let cv_id;
+        const existingCVResult = await db.query(
+            'SELECT id FROM cvs WHERE candidate_id = $1 LIMIT 1', // 👈 KHÔNG CẦN is_active
+            [candidate_id]
         );
 
-        const cv_id = cvResult.rows[0].id;
-        console.log('✅ CV saved to database, ID:', cv_id);
+        if (existingCVResult.rows.length > 0) {
+            // 👇 CV ĐÃ TỒN TẠI → CẬP NHẬT
+            cv_id = existingCVResult.rows[0].id;
+            console.log('📝 CV already exists, updating ID:', cv_id);
+
+            await db.query(
+                `UPDATE cvs 
+                 SET filename = $1, cv_text = $2, file_path = $3, created_at = CURRENT_TIMESTAMP 
+                 WHERE id = $4`,
+                [req.file.originalname, cvText, filePath, cv_id]
+            );
+            console.log('✅ CV updated successfully');
+        } else {
+            // 👇 CV CHƯA TỒN TẠI → TẠO MỚI
+            const cvResult = await db.query(
+                `INSERT INTO cvs (candidate_id, filename, cv_text, file_path) 
+                 VALUES ($1, $2, $3, $4) 
+                 RETURNING id`,
+                [candidate_id, req.file.originalname, cvText, filePath]
+            );
+            cv_id = cvResult.rows[0].id;
+            console.log('✅ CV created, ID:', cv_id);
+        }
 
         // 5. Tạo application
         const appResult = await db.query(
@@ -135,6 +96,31 @@ const applyForJob = async (req, res) => {
         );
 
         console.log('✅ Application created, ID:', appResult.rows[0].id);
+
+        // 👇 THÊM: Lấy thông tin candidate và employer để tạo notification
+        const candidateResult = await db.query(
+            'SELECT full_name FROM users WHERE id = $1',
+            [candidate_id]
+        );
+        const candidateName = candidateResult.rows[0]?.full_name || 'A candidate';
+
+        const employerResult = await db.query(
+            'SELECT employer_id FROM jobs WHERE id = $1',
+            [job_id]
+        );
+        const employerId = employerResult.rows[0]?.employer_id;
+
+        // 👇 THÊM: Tạo notification cho employer
+        if (employerId) {
+            await createNotification(
+                employerId,
+                'new_application',
+                '📝 New Job Application',
+                `${candidateName} has applied for your job: ${job.title}`,
+                `/employer/jobs/${job_id}/applications`
+            );
+            console.log(`✅ Notification sent to employer ${employerId}`);
+        }
 
         res.status(201).json({
             message: 'Application submitted successfully',
@@ -229,38 +215,69 @@ const analyzeApplication = async (req, res) => {
 
 // Update application status (Employer only)
 const updateApplicationStatus = async (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-    const employer_id = req.user.id;
-    
-    // Validate status
-    const validStatuses = ['pending', 'reviewed', 'accepted', 'rejected'];
-    if (!validStatuses.includes(status)) {
-        return res.status(400).json({ error: 'Invalid status' });
-    }
-    
     try {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        // Validate status
+        const validStatuses = ['pending', 'reviewed', 'accepted', 'rejected'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status' });
+        }
+        
         // Verify the application belongs to employer's job
         const checkResult = await db.query(`
-            SELECT a.id 
+            SELECT a.id, j.title, a.candidate_id 
             FROM applications a
             JOIN jobs j ON a.job_id = j.id
             WHERE a.id = $1 AND j.employer_id = $2
-        `, [id, employer_id]);
+        `, [id, req.user.id]);
         
         if (checkResult.rows.length === 0) {
             return res.status(404).json({ error: 'Application not found or access denied' });
         }
-        
+
+        const application = checkResult.rows[0];
+
         // Update status
         await db.query(
             'UPDATE applications SET status = $1 WHERE id = $2',
             [status, id]
         );
-        
-        res.json({ message: 'Application status updated successfully' });
+
+        // 👇 THÊM: Tạo notification dựa trên status
+        const statusMessages = {
+            reviewed: {
+                title: '✅ Application Reviewed',
+                message: `Your application for ${job.title} has been reviewed`,
+                icon: '✅'
+            },
+            accepted: {
+                title: '🎉 Application Accepted',
+                message: `Congratulations! Your application for ${job.title} has been accepted`,
+                icon: '🎉'
+            },
+            rejected: {
+                title: '❌ Application Update',
+                message: `Your application for ${job.title} has been updated`,
+                icon: '❌'
+            }
+        };
+
+        const notificationData = statusMessages[status];
+        if (notificationData) {
+            await createNotification(
+                application.candidate_id,
+                'application_status',
+                notificationData.title,
+                notificationData.message,
+                `/jobs/${job.id}`
+            );
+        }
+
+        res.json({ message: 'Application status updated' });
     } catch (error) {
-        console.error('Error updating application status:', error);
+        console.error('Update status error:', error);
         res.status(500).json({ error: 'Failed to update application status' });
     }
 };
@@ -354,5 +371,5 @@ module.exports = {
     analyzeApplication,
     updateApplicationStatus,
     checkApplicationStatus,
-    downloadCV // 👈 EXPORT HÀM MỚI
+    downloadCV
 };

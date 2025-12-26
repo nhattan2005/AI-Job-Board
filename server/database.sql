@@ -90,7 +90,7 @@ CREATE TABLE jobs (
     location VARCHAR(255),
     salary_range VARCHAR(100),
     employment_type VARCHAR(50), -- full-time, part-time, contract
-    vector VECTOR(768), -- Google Gemini text-embedding-004 uses 768 dimensions
+    vector VECTOR(768) DEFAULT NULL, -- Google Gemini text-embedding-004 uses 768 dimensions
     status VARCHAR(20) DEFAULT 'active', -- active, closed, draft
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -168,24 +168,27 @@ CREATE TABLE interview_time_slots (
 );
 
 -- Create Mock Interviews Table
-CREATE TABLE mock_interviews (
+CREATE TABLE IF NOT EXISTS mock_interviews (
     session_id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    job_id INT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    job_id INT REFERENCES jobs(id) ON DELETE CASCADE, -- 👈 SỬA: Cho phép NULL
     interview_type interview_type NOT NULL,
+    
+    -- 👇 THÊM 2 CỘT MỚI
+    cv_text TEXT,
+    job_description TEXT,
     
     -- Stores array of objects: [{role: 'user'|'model', text: '...', timestamp: '...'}]
     chat_history JSONB DEFAULT '[]'::jsonb,
     
     -- Stores fluency data: { hesitation_count: 0, wpm_avg: 0, total_duration: 0 }
-    audio_metrics JSONB DEFAULT '{}'::jsonb,
+    fluency_data JSONB DEFAULT '{}'::jsonb,
     
-    overall_score INT, -- 0 to 100
-    final_feedback TEXT,
+    overall_score DECIMAL(5, 2),
+    final_feedback JSONB,
+    status VARCHAR(20) DEFAULT 'in_progress',
     
-    status VARCHAR(20) DEFAULT 'active', -- active, completed
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================
@@ -339,6 +342,40 @@ INSERT INTO banners (title, subtitle, image_url, display_order, is_active) VALUE
 ('Career Growth Starts Here', 'Connect with top employers', '/images/banner2.jpg', 2, TRUE),
 ('Your Future Awaits', 'Discover amazing opportunities', '/images/banner3.png', 3, TRUE)
 ON CONFLICT DO NOTHING;
+
+-- ============================================
+-- FAVORITE JOBS: Tables & Columns
+-- ============================================
+
+-- Bảng lưu công việc yêu thích
+CREATE TABLE IF NOT EXISTS favorite_jobs (
+    id SERIAL PRIMARY KEY,
+    candidate_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(candidate_id, job_id) -- Mỗi user chỉ favorite 1 job 1 lần
+);
+
+-- Index để query nhanh hơn
+CREATE INDEX IF NOT EXISTS idx_favorite_candidate ON favorite_jobs(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_favorite_job ON favorite_jobs(job_id);
+
+-- Create Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL, -- 'interview_invite', 'application_status', 'job_alert', etc.
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    link VARCHAR(500), -- Link để redirect khi click notification
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create index for faster queries
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 
 -- Success message
 DO $$ 

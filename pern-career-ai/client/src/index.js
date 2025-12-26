@@ -15,12 +15,28 @@ const employerRoutes = require('./routes/employerRoutes');
 const interviewRoutes = require('./routes/interviewRoutes');
 const careerRoutes = require('./routes/careerRoutes');
 const mockInterviewRoutes = require('./routes/mockInterviewRoutes'); // <--- THÊM DÒNG NÀY
+const authRoutes = require('./routes/authRoutes');
+const jobRoutes = require('./routes/jobRoutes');
+const applicationRoutes = require('./routes/applicationRoutes');
+const cvRoutes = require('./routes/cvRoutes');
+const employerEmailRoutes = require('./routes/employerEmailRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const bannerRoutes = require('./routes/bannerRoutes');
 
+app.use('/api/auth', authRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/applications', applicationRoutes);
 app.use('/api/cv', cvRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/employer', employerRoutes);
-app.use('/api/interviews', interviewRoutes);
 app.use('/api/career', careerRoutes);
-app.use('/api/mock-interview', mockInterviewRoutes); // <--- THÊM DÒNG NÀY
+
+// 👇 ĐẢM BẢO DÒNG NÀY TỒN TẠI
+app.use('/api/interviews', interviewRoutes); // hoặc /api/interview (kiểm tra kỹ)
+
+app.use('/api/mock-interview', mockInterviewRoutes);
+app.use('/api/employer-email', employerEmailRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/banners', bannerRoutes);
 
 // Health check endpoint
