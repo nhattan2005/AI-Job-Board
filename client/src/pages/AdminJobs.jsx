@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import AdminLayout from '../components/AdminLayout'; // 👈 IMPORT
 
 const AdminJobs = () => {
     const [jobs, setJobs] = useState([]);
@@ -55,13 +56,12 @@ const AdminJobs = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto">
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">Job Management</h1>
-            </div>
-
+        <AdminLayout 
+            title="Job Management" 
+            subtitle="Review and moderate job postings"
+        >
             {/* Filters */}
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6 flex gap-4">
+            <div className="bg-white rounded-xl shadow-md p-4 mb-6 flex gap-4">
                 <select
                     value={filter.status}
                     onChange={(e) => setFilter({ ...filter, status: e.target.value })}
@@ -183,7 +183,7 @@ const AdminJobs = () => {
                     </div>
                 </div>
             )}
-        </div>
+        </AdminLayout>
     );
 };
 

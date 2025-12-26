@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import AdminLayout from '../components/AdminLayout'; // 👈 IMPORT
 
 const AdminDashboard = () => {
     const [stats, setStats] = useState(null);
@@ -28,22 +29,22 @@ const AdminDashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
+            <AdminLayout title="Admin Dashboard" subtitle="Loading...">
+                <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                </div>
+            </AdminLayout>
         );
     }
 
     return (
-        <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p className="text-gray-600 mt-2">Manage users, jobs, and monitor platform activity</p>
-            </div>
-
+        <AdminLayout 
+            title="Admin Dashboard" 
+            subtitle="Manage users, jobs, and monitor platform activity"
+        >
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
                     <div className="flex items-center">
                         <div className="p-3 rounded-full bg-blue-100 text-blue-600">
                             <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,7 +58,7 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
                     <div className="flex items-center">
                         <div className="p-3 rounded-full bg-green-100 text-green-600">
                             <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,7 +72,7 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
                     <div className="flex items-center">
                         <div className="p-3 rounded-full bg-purple-100 text-purple-600">
                             <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,7 +86,7 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow">
                     <div className="flex items-center">
                         <div className="p-3 rounded-full bg-red-100 text-red-600">
                             <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,9 +103,9 @@ const AdminDashboard = () => {
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <Link to="/admin/users" className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+                <Link to="/admin/users" className="group bg-white rounded-xl shadow-md p-6 hover:shadow-xl hover:scale-105 transition-all duration-300">
                     <div className="flex items-center">
-                        <svg className="h-10 w-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-10 w-10 text-blue-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                         <div className="ml-4">
@@ -114,9 +115,9 @@ const AdminDashboard = () => {
                     </div>
                 </Link>
 
-                <Link to="/admin/jobs" className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+                <Link to="/admin/jobs" className="group bg-white rounded-xl shadow-md p-6 hover:shadow-xl hover:scale-105 transition-all duration-300">
                     <div className="flex items-center">
-                        <svg className="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="h-10 w-10 text-green-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
                         <div className="ml-4">
@@ -126,21 +127,21 @@ const AdminDashboard = () => {
                     </div>
                 </Link>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <Link to="/admin/banners" className="group bg-white rounded-xl shadow-md p-6 hover:shadow-xl hover:scale-105 transition-all duration-300">
                     <div className="flex items-center">
-                        <svg className="h-10 w-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        <svg className="h-10 w-10 text-indigo-600 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         <div className="ml-4">
-                            <h3 className="text-lg font-bold text-gray-800">Analytics</h3>
-                            <p className="text-sm text-gray-600">{stats?.applications_this_week || 0} apps this week</p>
+                            <h3 className="text-lg font-bold text-gray-800">Manage Banners</h3>
+                            <p className="text-sm text-gray-600">Homepage carousel images</p>
                         </div>
                     </div>
-                </div>
+                </Link>
             </div>
 
             {/* Recent Actions */}
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-xl shadow-md p-6">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Admin Actions</h2>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -155,7 +156,7 @@ const AdminDashboard = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {recentActions.map((action) => (
-                                <tr key={action.id}>
+                                <tr key={action.id} className="hover:bg-gray-50 transition">
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         {action.action_type.replace('_', ' ').toUpperCase()}
                                     </td>
@@ -177,7 +178,7 @@ const AdminDashboard = () => {
                     </table>
                 </div>
             </div>
-        </div>
+        </AdminLayout>
     );
 };
 

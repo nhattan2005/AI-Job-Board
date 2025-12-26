@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import AdminLayout from '../components/AdminLayout'; // 👈 IMPORT
 
 const AdminUsers = () => {
     const [users, setUsers] = useState([]);
@@ -54,13 +55,12 @@ const AdminUsers = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto">
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-            </div>
-
+        <AdminLayout 
+            title="User Management" 
+            subtitle="View and moderate user accounts"
+        >
             {/* Filters */}
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6 flex gap-4">
+            <div className="bg-white rounded-xl shadow-md p-4 mb-6 flex gap-4">
                 <select
                     value={filter.role}
                     onChange={(e) => setFilter({ ...filter, role: e.target.value })}
@@ -83,7 +83,7 @@ const AdminUsers = () => {
             </div>
 
             {/* User Table */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-xl shadow-md overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -148,7 +148,7 @@ const AdminUsers = () => {
             </div>
 
             {/* Pagination */}
-            <div className="mt-4 flex justify-center gap-2">
+            <div className="mt-6 flex justify-center gap-2">
                 <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
@@ -195,7 +195,7 @@ const AdminUsers = () => {
                     </div>
                 </div>
             )}
-        </div>
+        </AdminLayout>
     );
 };
 

@@ -49,8 +49,22 @@ const cvStorage = new CloudinaryStorage({
     }
 });
 
+// 🖼️ CẤU HÌNH CHO BANNER IMAGES
+const bannerStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'ai-job-board/banners',
+        allowed_formats: ['jpg', 'png', 'jpeg', 'gif', 'webp'],
+        transformation: [{ width: 1920, height: 600, crop: 'fill' }], // 16:5 aspect ratio
+        public_id: (req, file) => {
+            return `banner_${Date.now()}`;
+        }
+    }
+});
+
 module.exports = {
     cloudinary,
     avatarStorage,
-    cvStorage
+    cvStorage,
+    bannerStorage // 👈 EXPORT THÊM
 };
