@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../services/api'; // SỬA DÒNG NÀY
+import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const EmployerDashboard = () => {
@@ -14,20 +14,33 @@ const EmployerDashboard = () => {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
+    // 👇 THÊM STATE CHO PAGINATION
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const jobsPerPage = 5; // Số jobs mỗi trang
 
     useEffect(() => {
         fetchDashboardData();
-    }, []);
+    }, [page]); // 👈 THÊM page VÀO DEPENDENCY
 
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
             
-            // Fetch jobs - SỬA: Dùng api service và xóa /api
+            // Fetch jobs
             const jobsResponse = await api.get('/jobs/my-jobs');
-            setJobs(jobsResponse.data);
+            const allJobs = jobsResponse.data;
             
-            // Fetch stats - SỬA: Dùng api service và xóa /api
+            // 👇 TÍNH TOÁN PAGINATION
+            setTotalPages(Math.ceil(allJobs.length / jobsPerPage));
+            const startIndex = (page - 1) * jobsPerPage;
+            const endIndex = startIndex + jobsPerPage;
+            const paginatedJobs = allJobs.slice(startIndex, endIndex);
+            
+            setJobs(paginatedJobs);
+
+            // Fetch stats
             const statsResponse = await api.get('/employer/stats');
             setStats(statsResponse.data);
         } catch (error) {
@@ -56,7 +69,7 @@ const EmployerDashboard = () => {
                 <p className="text-gray-600">Manage your job postings and applications</p>
             </div>
 
-            {/* Stats */}
+            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-white rounded-lg shadow-md p-6">
                     <div className="flex items-center">
@@ -118,7 +131,7 @@ const EmployerDashboard = () => {
             {/* Quick Actions */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Link
                         to="/employer/post-job"
                         className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
@@ -142,6 +155,19 @@ const EmployerDashboard = () => {
                         <div>
                             <h3 className="font-semibold text-gray-800">View All Applications</h3>
                             <p className="text-sm text-gray-600">Review all candidate applications</p>
+                        </div>
+                    </Link>
+
+                    <Link
+                        to="/my-interviews"
+                        className="flex items-center p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
+                    >
+                        <svg className="h-8 w-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <div>
+                            <h3 className="font-semibold text-gray-800">My Interviews</h3>
+                            <p className="text-sm text-gray-600">Manage scheduled interviews</p>
                         </div>
                     </Link>
                 </div>
@@ -172,49 +198,65 @@ const EmployerDashboard = () => {
                         </Link>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {jobs.map(job => (
-                            <div key={job.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-500 transition">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                        <h3 className="text-lg font-semibold text-gray-800 mb-1">{job.title}</h3>
-                                        <p className="text-gray-600 text-sm mb-2">{job.location}</p>
-                                        <div className="flex items-center space-x-4 text-sm text-gray-500">
-                                            <span>{job.application_count || 0} applications</span>
-                                            <span>•</span>
-                                            <span>{new Date(job.created_at).toLocaleDateString()}</span>
+                    <>
+                        {/* Jobs List */}
+                        <div className="space-y-4">
+                            {jobs.map(job => (
+                                <div key={job.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-500 transition">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-1">{job.title}</h3>
+                                            <p className="text-gray-600 text-sm mb-2">{job.location}</p>
+                                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                                <span>{job.application_count || 0} applications</span>
+                                                <span>•</span>
+                                                <span>{new Date(job.created_at).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <Link
+                                                to={`/employer/jobs/${job.id}/applications`}
+                                                className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-semibold hover:bg-blue-200 transition text-sm"
+                                            >
+                                                View Applications
+                                            </Link>
+                                            <Link
+                                                to={`/employer/edit-job/${job.id}`}
+                                                className="p-2 text-gray-600 hover:text-blue-600 transition"
+                                            >
+                                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                            </Link>
                                         </div>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                            job.status === 'active' 
-                                                ? 'bg-green-100 text-green-800' 
-                                                : 'bg-gray-100 text-gray-800'
-                                        }`}>
-                                            {job.status}
-                                        </span>
-                                        <Link
-                                            to={`/employer/jobs/${job.id}/applications`}
-                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
-                                        >
-                                            View Applications
-                                        </Link>
-                                        
-                                        {/* 👇 THÊM NÚT EDIT */}
-                                        <Link
-                                            to={`/employer/edit-job/${job.id}`}
-                                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition font-semibold flex items-center"
-                                        >
-                                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                            Edit
-                                        </Link>
-                                    </div>
                                 </div>
+                            ))}
+                        </div>
+
+                        {/* 👇 THÊM PAGINATION - GIỐNG ADMIN USERS */}
+                        {totalPages > 1 && (
+                            <div className="mt-6 flex justify-center gap-2">
+                                <button
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={page === 1}
+                                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                    Previous
+                                </button>
+                                <span className="px-4 py-2 text-gray-700 font-medium">
+                                    Page {page} of {totalPages}
+                                </span>
+                                <button
+                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={page === totalPages}
+                                    className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 font-semibold hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                >
+                                    Next
+                                </button>
                             </div>
-                        ))}
-                    </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

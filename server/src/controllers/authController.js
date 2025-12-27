@@ -388,7 +388,25 @@ const updateProfile = async (req, res) => {
     try {
         const userId = req.user.id;
         const userRole = req.user.role;
-        const { phone, full_name, bio, skills, company_name, company_description, website } = req.body;
+        const { 
+            phone, 
+            full_name, 
+            bio, 
+            skills, 
+            company_name, 
+            company_description, 
+            website,
+            company_address,
+            company_size,
+            company_industry,
+            company_founded_year,
+            company_benefits,
+            company_email,
+            company_phone,
+            social_linkedin,
+            social_facebook,
+            social_twitter
+        } = req.body;
 
         let result;
 
@@ -403,10 +421,42 @@ const updateProfile = async (req, res) => {
         } else {
             result = await db.query(
                 `UPDATE users 
-                 SET phone = $1, company_name = $2, company_description = $3, website = $4, updated_at = CURRENT_TIMESTAMP
-                 WHERE id = $5
-                 RETURNING id, email, role, company_name, company_description, website, phone, avatar_url, created_at`,
-                [phone, company_name, company_description || '', website || '', userId]
+                 SET phone = $1, 
+                     company_name = $2, 
+                     company_description = $3, 
+                     website = $4,
+                     company_address = $5,
+                     company_size = $6,
+                     company_industry = $7,
+                     company_founded_year = $8,
+                     company_benefits = $9,
+                     company_email = $10,
+                     company_phone = $11,
+                     social_linkedin = $12,
+                     social_facebook = $13,
+                     social_twitter = $14,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $15
+                 RETURNING id, email, role, company_name, company_description, website, phone, avatar_url, created_at,
+                           company_address, company_size, company_industry, company_founded_year, company_benefits,
+                           company_email, company_phone, social_linkedin, social_facebook, social_twitter`,
+                [
+                    phone, 
+                    company_name, 
+                    company_description || '', 
+                    website || '',
+                    company_address || '',
+                    company_size || '',
+                    company_industry || '',
+                    company_founded_year || null,
+                    company_benefits || [],
+                    company_email || '',
+                    company_phone || '',
+                    social_linkedin || '',
+                    social_facebook || '',
+                    social_twitter || '',
+                    userId
+                ]
             );
         }
 
