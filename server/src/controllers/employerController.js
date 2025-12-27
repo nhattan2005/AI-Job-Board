@@ -75,7 +75,80 @@ const getAllApplications = async (req, res) => {
     }
 };
 
+// Get public employer profile
+const getEmployerProfile = async (req, res) => {
+    try {
+        const { employerId } = req.params;
+
+        const result = await db.query(
+            `SELECT 
+                id, 
+                company_name, 
+                company_description, 
+                email, 
+                website, 
+                company_email,
+                company_phone,
+                avatar_url,
+                created_at,
+                company_address,
+                company_size,
+                company_industry,
+                company_founded_year,
+                company_benefits,
+                social_linkedin,
+                social_facebook,
+                social_twitter
+            FROM users 
+            WHERE id = $1 AND role = 'employer'`,
+            [employerId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Employer not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error fetching employer profile:', error);
+        res.status(500).json({ error: 'Failed to fetch employer profile' });
+    }
+};
+
+// Get employer's active jobs
+const getEmployerJobs = async (req, res) => {
+    try {
+        const { employerId } = req.params;
+
+        const result = await db.query(
+            `SELECT 
+                id, 
+                title, 
+                description, 
+                location, 
+                salary_range, 
+                employment_type, 
+                created_at,
+                deadline
+            FROM jobs 
+            WHERE employer_id = $1 
+                AND status = 'active' 
+                AND (is_hidden = FALSE OR is_hidden IS NULL)
+                AND (deadline IS NULL OR deadline > NOW())
+            ORDER BY created_at DESC`,
+            [employerId]
+        );
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching employer jobs:', error);
+        res.status(500).json({ error: 'Failed to fetch employer jobs' });
+    }
+};
+
 module.exports = {
     getEmployerStats,
-    getAllApplications
+    getAllApplications,
+    getEmployerProfile,
+    getEmployerJobs
 };

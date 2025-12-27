@@ -35,6 +35,7 @@ import MyFavorites from './pages/MyFavorites'; // 👈 THÊM IMPORT
 import PracticeInterviewSetup from './pages/PracticeInterviewSetup'; // 👈 THÊM
 import PracticeInterviewRoom from './pages/PracticeInterviewRoom'; // 👈 THÊM
 import NotificationsPage from './pages/NotificationsPage'; // 👈 THÊM
+import EmployerPublicProfile from './pages/EmployerPublicProfile'; // 👈 THÊM
 
 const App = () => {
     return (
@@ -220,6 +221,9 @@ const App = () => {
 
                             <Route path="/privacy-policy" element={<PrivacyPage />} />
                             <Route path="/terms-of-service" element={<TermsPage />} />
+
+                            {/* 👇 THÊM ROUTE MỚI */}
+                            <Route path="/employer/:employerId" element={<EmployerPublicProfile />} />
 
                             {/* 404 Page */}
                             <Route path="*" element={<h1>404 Not Found</h1>} />

@@ -71,6 +71,15 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
             // Nếu là Office thì lưu địa chỉ cụ thể, nếu không thì giữ nguyên (Online/Phone)
             const finalLocation = location === 'Office' ? officeAddress : location;
 
+            console.log('📤 Sending invitation with data:', {
+                applicationId: application.id,
+                timeSlots,
+                location: finalLocation,
+                meetingLink: location === 'Online' ? meetingLink : null,
+                notes,
+                duration
+            });
+
             const response = await api.post('/interviews/send-invitation', {
                 applicationId: application.id,
                 timeSlots,
@@ -79,6 +88,8 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
                 notes,
                 duration
             });
+
+            console.log('✅ Response:', response.data);
 
             setSuccess(true);
             
@@ -128,8 +139,16 @@ Hiring Team`
             }, 2000);
 
         } catch (err) {
-            console.error('Error:', err);
-            setError(err.response?.data?.error || 'Failed to send invitation');
+            console.error('❌ Error details:', err);
+            console.error('❌ Response data:', err.response?.data);
+            
+            // Hiển thị lỗi chi tiết hơn
+            const errorMessage = err.response?.data?.details 
+                || err.response?.data?.error 
+                || err.message 
+                || 'Failed to send invitation';
+            
+            setError(errorMessage);
         } finally {
             setSending(false);
         }

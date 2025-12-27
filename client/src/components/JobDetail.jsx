@@ -278,29 +278,36 @@ const JobDetail = () => {
                             <div className="flex-1">
                                 <h1 className="text-3xl font-bold text-slate-900 mb-2">{job.title}</h1>
                                 <div className="flex items-center gap-3">
-                                    {/* Avatar */}
-                                    <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
-                                        {job.avatar_url ? (
-                                            <img 
-                                                src={job.avatar_url} 
-                                                alt={job.company_name} 
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    e.target.style.display = 'none';
-                                                    e.target.nextSibling.style.display = 'flex';
-                                                }}
-                                            />
-                                        ) : null}
-                                        <span 
-                                            style={{ display: job.avatar_url ? 'none' : 'flex' }}
-                                            className="w-full h-full flex items-center justify-center font-bold text-slate-500"
-                                        >
-                                            {job.company_name?.charAt(0)}
-                                        </span>
-                                    </div>
+                                    {/* Avatar - LINK TO COMPANY PROFILE */}
+                                    <Link to={`/employer/${job.employer_id}`}>
+                                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 hover:border-blue-500 transition cursor-pointer">
+                                            {job.avatar_url ? (
+                                                <img 
+                                                    src={job.avatar_url} 
+                                                    alt={job.company_name} 
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <span 
+                                                style={{ display: job.avatar_url ? 'none' : 'flex' }}
+                                                className="w-full h-full flex items-center justify-center font-bold text-slate-500"
+                                            >
+                                                {job.company_name?.charAt(0)}
+                                            </span>
+                                        </div>
+                                    </Link>
                                     
                                     <div className="flex items-center gap-2 text-lg font-medium text-slate-600">
-                                        <span className="text-primary-600">{job.company_name}</span>
+                                        <Link 
+                                            to={`/employer/${job.employer_id}`} 
+                                            className="text-primary-600 hover:text-blue-600 transition"
+                                        >
+                                            {job.company_name}
+                                        </Link>
                                         <span className="text-slate-300">•</span>
                                         <span>{job.location}</span>
                                     </div>

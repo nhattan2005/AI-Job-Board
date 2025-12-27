@@ -23,6 +23,16 @@ const ProfilePage = () => {
     const [companyName, setCompanyName] = useState('');
     const [companyDescription, setCompanyDescription] = useState('');
     const [website, setWebsite] = useState('');
+    const [companyAddress, setCompanyAddress] = useState('');
+    const [companySize, setCompanySize] = useState('');
+    const [companyIndustry, setCompanyIndustry] = useState('');
+    const [companyFoundedYear, setCompanyFoundedYear] = useState('');
+    const [companyBenefits, setCompanyBenefits] = useState('');
+    const [companyEmail, setCompanyEmail] = useState('');
+    const [companyPhone, setCompanyPhone] = useState('');
+    const [socialLinkedin, setSocialLinkedin] = useState('');
+    const [socialFacebook, setSocialFacebook] = useState('');
+    const [socialTwitter, setSocialTwitter] = useState('');
 
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState('');
@@ -42,6 +52,16 @@ const ProfilePage = () => {
                 setCompanyName(user.company_name || '');
                 setCompanyDescription(user.company_description || '');
                 setWebsite(user.website || '');
+                setCompanyAddress(user.company_address || '');
+                setCompanySize(user.company_size || '');
+                setCompanyIndustry(user.company_industry || '');
+                setCompanyFoundedYear(user.company_founded_year || '');
+                setCompanyBenefits(user.company_benefits ? user.company_benefits.join(', ') : '');
+                setCompanyEmail(user.company_email || '');
+                setCompanyPhone(user.company_phone || '');
+                setSocialLinkedin(user.social_linkedin || '');
+                setSocialFacebook(user.social_facebook || '');
+                setSocialTwitter(user.social_twitter || '');
             }
 
             setAvatarUrl(user.avatar_url || ''); // Load avatar từ user context
@@ -121,6 +141,16 @@ const ProfilePage = () => {
                 updateData.company_name = companyName;
                 updateData.company_description = companyDescription;
                 updateData.website = website;
+                updateData.company_address = companyAddress;
+                updateData.company_size = companySize;
+                updateData.company_industry = companyIndustry;
+                updateData.company_founded_year = companyFoundedYear ? parseInt(companyFoundedYear) : null;
+                updateData.company_benefits = companyBenefits.split(',').map(b => b.trim()).filter(b => b);
+                updateData.company_email = companyEmail;
+                updateData.company_phone = companyPhone;
+                updateData.social_linkedin = socialLinkedin;
+                updateData.social_facebook = socialFacebook;
+                updateData.social_twitter = socialTwitter;
             }
 
             const response = await api.put('/auth/profile', updateData);
@@ -187,7 +217,7 @@ const ProfilePage = () => {
                         <p className="text-gray-600">Manage your account information</p>
                     </div>
 
-                    {/* 👇 THÊM PHẦN NÀY - HIỂN THỊ ROLE */}
+                    {/* Role Badge */}
                     <div className={`px-4 py-2 rounded-lg border-2 font-semibold flex items-center gap-2 ${
                         user?.role === 'admin' 
                             ? 'bg-purple-50 border-purple-200 text-purple-700'
@@ -220,6 +250,33 @@ const ProfilePage = () => {
                 </div>
             </div>
 
+            {/* 👇 THÊM PHẦN NÀY CHO EMPLOYER */}
+            {isEmployer && user?.id && (
+                <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            <div>
+                                <h3 className="font-bold text-gray-800">Company Public Profile</h3>
+                                <p className="text-sm text-gray-600">See how candidates view your company</p>
+                            </div>
+                        </div>
+                        <Link
+                            to={`/employer/${user.id}`}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold transition flex items-center gap-2"
+                        >
+                            View Profile
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </Link>
+                    </div>
+                </div>
+            )}
+
+            {/* Success/Error Messages */}
             {success && (
                 <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
                     {success}
@@ -342,6 +399,10 @@ const ProfilePage = () => {
                     {/* Employer Fields */}
                     {isEmployer && (
                         <>
+                            <div className="border-t pt-6">
+                                <h3 className="text-lg font-bold text-gray-800 mb-4">Company Information</h3>
+                            </div>
+
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                                     Company Name <span className="text-red-500">*</span>
@@ -352,19 +413,131 @@ const ProfilePage = () => {
                                     value={companyName}
                                     onChange={(e) => setCompanyName(e.target.value)}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="TechCorp Inc."
                                 />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                    Company Description
+                                    Company Description <span className="text-red-500">*</span>
                                 </label>
                                 <textarea
+                                    required
                                     value={companyDescription}
                                     onChange={(e) => setCompanyDescription(e.target.value)}
                                     rows="4"
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Giới thiệu về công ty, văn hóa và sứ mệnh..."
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Company Address <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    required
+                                    value={companyAddress}
+                                    onChange={(e) => setCompanyAddress(e.target.value)}
+                                    rows="2"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Tầng 12, Bitexco Financial Tower, 2 Hai Trieu, Quận 1, TPHCM"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                        Company Size
+                                    </label>
+                                    <select
+                                        value={companySize}
+                                        onChange={(e) => setCompanySize(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        <option value="">Select size</option>
+                                        <option value="1-10">1-10 employees</option>
+                                        <option value="11-50">11-50 employees</option>
+                                        <option value="51-200">51-200 employees</option>
+                                        <option value="201-500">201-500 employees</option>
+                                        <option value="501-1000">501-1000 employees</option>
+                                        <option value="1000+">1000+ employees</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                        Founded Year
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={companyFoundedYear}
+                                        onChange={(e) => setCompanyFoundedYear(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="2020"
+                                        min="1800"
+                                        max={new Date().getFullYear()}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Industry
+                                </label>
+                                <input
+                                    type="text"
+                                    value={companyIndustry}
+                                    onChange={(e) => setCompanyIndustry(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Software Development, E-commerce, FinTech, etc."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Company Benefits (ngăn cách bằng dấu phẩy)
+                                </label>
+                                <textarea
+                                    value={companyBenefits}
+                                    onChange={(e) => setCompanyBenefits(e.target.value)}
+                                    rows="3"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Lương cạnh tranh, Bảo hiểm sức khỏe, Remote work, Ngân sách học tập"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Nhập các phúc lợi cách nhau bằng dấu phẩy</p>
+                            </div>
+
+                            <div className="border-t pt-6">
+                                <h3 className="text-lg font-bold text-gray-800 mb-4">Contact Information</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                        Company Email
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={companyEmail}
+                                        onChange={(e) => setCompanyEmail(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="hr@company.com"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                        Company Phone
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        value={companyPhone}
+                                        onChange={(e) => setCompanyPhone(e.target.value)}
+                                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        placeholder="+84 123 456 789"
+                                    />
+                                </div>
                             </div>
 
                             <div>
@@ -377,6 +550,49 @@ const ProfilePage = () => {
                                     onChange={(e) => setWebsite(e.target.value)}
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="https://yourcompany.com"
+                                />
+                            </div>
+
+                            <div className="border-t pt-6">
+                                <h3 className="text-lg font-bold text-gray-800 mb-4">Social Media</h3>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    LinkedIn
+                                </label>
+                                <input
+                                    type="url"
+                                    value={socialLinkedin}
+                                    onChange={(e) => setSocialLinkedin(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="https://linkedin.com/company/yourcompany"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Facebook
+                                </label>
+                                <input
+                                    type="url"
+                                    value={socialFacebook}
+                                    onChange={(e) => setSocialFacebook(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="https://facebook.com/yourcompany"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Twitter
+                                </label>
+                                <input
+                                    type="url"
+                                    value={socialTwitter}
+                                    onChange={(e) => setSocialTwitter(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="https://twitter.com/yourcompany"
                                 />
                             </div>
                         </>
