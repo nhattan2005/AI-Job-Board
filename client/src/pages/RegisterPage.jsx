@@ -29,6 +29,8 @@ const RegisterPage = () => {
     const [verificationType, setVerificationType] = useState('otp');
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);           // 👈 THÊM
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false); // 👈 THÊM
 
     useEffect(() => {
         if (error && topRef.current) {
@@ -249,33 +251,49 @@ const RegisterPage = () => {
                             />
                         </div>
 
+                        {/* Password */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Password <span className="text-red-500">*</span>
                             </label>
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Min. 8 characters"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="text-sm text-blue-600 hover:underline mt-1"
+                            >
+                                {showPassword ? "Hide" : "Show"} password
+                            </button>
                             <PasswordStrengthIndicator password={password} />
                         </div>
 
+                        {/* Confirm Password */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Confirm Password <span className="text-red-500">*</span>
                             </label>
                             <input
-                                type="password"
+                                type={showConfirmPassword ? "text" : "password"}
                                 required
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="Confirm your password"
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                className="text-sm text-blue-600 hover:underline mt-1"
+                            >
+                                {showConfirmPassword ? "Hide" : "Show"} password
+                            </button>
                         </div>
                     </div>
 

@@ -65,6 +65,8 @@ const getAllApplications = async (req, res) => {
             JOIN users u ON a.candidate_id = u.id
             JOIN cvs c ON a.cv_id = c.id
             WHERE j.employer_id = $1
+              AND COALESCE(a.is_hidden, false) = false
+              AND COALESCE(u.is_banned, false) = false
             ORDER BY a.applied_at DESC
         `, [employer_id]);
         
