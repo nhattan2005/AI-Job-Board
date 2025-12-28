@@ -33,14 +33,37 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response && error.response.status === 401) {
-            console.error('❌ 401 Unauthorized - Token invalid or expired');
-            // Chỉ logout nếu không phải trang login/register
-            if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+        // 👇 THÊM: Xử lý 403 (banned account)
+        if (error.response && error.response.status === 403) {
+            const errorData = error.response.data;
+            
+            if (errorData?.isBanned || errorData?.error === 'Account Suspended') {
+                console.error('🚫 Account Suspended');
                 localStorage.removeItem('token');
+                
+                // Hiển thị alert với message từ server
+                alert(errorData.message || 'Your account has been suspended. Please contact support.');
+                
                 window.location.href = '/login';
             }
         }
+        
+        // 👇 GIỮ NGUYÊN: Xử lý 401
+        if (error.response && error.response.status === 401) {
+            const errorData = error.response.data;
+            
+            // Nếu là token expired/invalid
+            if (errorData?.error === 'Token expired' || errorData?.error === 'Invalid token') {
+                console.error('🔒 Token invalidated - logging out');
+                localStorage.removeItem('token');
+                
+                if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+                    alert('Your session has expired. Please login again.');
+                    window.location.href = '/login';
+                }
+            }
+        }
+        
         return Promise.reject(error);
     }
 );

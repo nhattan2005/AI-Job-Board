@@ -424,6 +424,10 @@ ALTER TABLE user_roadmaps
 ADD COLUMN IF NOT EXISTS current_positioning JSONB,
 ADD COLUMN IF NOT EXISTS skill_gap JSONB;
 
+-- Thêm cột token_version để invalidate tokens khi ban user
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0;
+COMMENT ON COLUMN users.token_version IS 'Increment this to invalidate all existing tokens';
+
 -- Verify
 SELECT column_name, data_type 
 FROM information_schema.columns 

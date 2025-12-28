@@ -12,7 +12,7 @@ const getFavoriteJobs = async (req, res) => {
                 j.id,
                 j.title,
                 j.description,
-                j.location, -- 👈 THÊM DÒNG NÀY
+                j.location,
                 j.salary_range,
                 j.employment_type,
                 j.status,
@@ -25,14 +25,15 @@ const getFavoriteJobs = async (req, res) => {
             JOIN jobs j ON f.job_id = j.id
             JOIN users u ON j.employer_id = u.id
             WHERE f.candidate_id = $1
+              AND COALESCE(u.is_banned, false) = false
             ORDER BY f.created_at DESC`,
             [candidateId]
         );
 
         res.json({ favorites: result.rows });
     } catch (error) {
-        console.error('Get favorites error:', error);
-        res.status(500).json({ error: 'Failed to get favorite jobs' });
+        console.error('Error fetching favorites:', error);
+        res.status(500).json({ error: 'Failed to fetch favorite jobs' });
     }
 };
 

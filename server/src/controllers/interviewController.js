@@ -153,10 +153,9 @@ const getCandidateInterviews = async (req, res) => {
                 i.created_at,
                 j.id as job_id,
                 j.title as job_title,
-                j.location,
                 u.company_name,
-                u.avatar_url,
-                -- 👇 SỬA: is_confirmed → is_selected
+                u.email as employer_email,
+                u.avatar_url as employer_avatar,
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -169,10 +168,11 @@ const getCandidateInterviews = async (req, res) => {
                 ) as time_slots
              FROM interviews i
              JOIN jobs j ON i.job_id = j.id
-             JOIN users u ON j.employer_id = u.id
+             JOIN users u ON i.employer_id = u.id
              LEFT JOIN interview_time_slots its ON its.interview_id = i.id
              WHERE i.candidate_id = $1
-             GROUP BY i.id, j.id, u.company_name, u.avatar_url
+               AND COALESCE(u.is_banned, false) = false
+             GROUP BY i.id, j.id, u.company_name, u.email, u.avatar_url
              ORDER BY i.created_at DESC`,
             [candidateId]
         );
@@ -251,9 +251,12 @@ const getInterviewByApplication = async (req, res) => {
                 u.company_name,
                 u.email as employer_email
              FROM interviews i
+             JOIN applications a ON i.application_id = a.id
              JOIN jobs j ON i.job_id = j.id
              JOIN users u ON i.employer_id = u.id
-             WHERE i.application_id = $1 AND i.candidate_id = $2`,
+             WHERE i.application_id = $1 
+               AND a.candidate_id = $2
+               AND COALESCE(u.is_banned, false) = false`,
             [applicationId, candidateId]
         );
 
@@ -261,30 +264,10 @@ const getInterviewByApplication = async (req, res) => {
             return res.status(404).json({ error: 'Interview not found' });
         }
 
-        const interview = result.rows[0];
-        
-        // Parse proposed_slots và format thành array of objects
-        let timeSlots = [];
-        try {
-            const slots = JSON.parse(interview.proposed_slots);
-            timeSlots = slots.map((slot, index) => ({
-                id: index,
-                datetime: slot,
-                is_selected: interview.confirmed_slot && JSON.parse(interview.confirmed_slot).id === index
-            }));
-        } catch (err) {
-            console.error('Error parsing slots:', err);
-        }
-
-        res.json({
-            interview: {
-                ...interview,
-                timeSlots
-            }
-        });
+        res.json(result.rows[0]);
     } catch (error) {
         console.error('Get interview by application error:', error);
-        res.status(500).json({ error: 'Failed to get interview details' });
+        res.status(500).json({ error: 'Failed to get interview' });
     }
 };
 

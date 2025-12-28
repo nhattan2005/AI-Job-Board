@@ -35,7 +35,7 @@ import TermsPage from './pages/TermsPage';
 import MyFavorites from './pages/MyFavorites'; // 👈 THÊM IMPORT
 import PracticeInterviewSetup from './pages/PracticeInterviewSetup'; // 👈 THÊM
 import PracticeInterviewRoom from './pages/PracticeInterviewRoom'; // 👈 THÊM
-import NotificationsPage from './pages/NotificationsPage'; // 👈 THÊM
+import NotificationsPage from './pages/NotificationsPage'; // 👈 ĐẢM BẢO DÒNG NÀY TỒN TẠI
 import EmployerPublicProfile from './pages/EmployerPublicProfile'; // 👈 THÊM
 import AdminManagement from './pages/AdminManagement'; // 👈 THÊM IMPORT
 
@@ -119,6 +119,42 @@ const App = () => {
                                 element={
                                     <ProtectedRoute requiredRole="candidate">
                                         <InterviewFeedback />
+                                    </ProtectedRoute>
+                                } 
+                            />
+
+                            {/* Candidate Routes */}
+                            <Route 
+                                path="/profile" 
+                                element={
+                                    <ProtectedRoute>
+                                        <ProfilePage />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            <Route 
+                                path="/my-applications" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <MyApplications />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            <Route 
+                                path="/my-favorites" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <MyFavorites />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            
+                            {/* 👇 THÊM ROUTE MỚI */}
+                            <Route 
+                                path="/notifications" 
+                                element={
+                                    <ProtectedRoute>
+                                        <NotificationsPage />
                                     </ProtectedRoute>
                                 } 
                             />

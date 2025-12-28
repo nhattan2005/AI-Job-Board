@@ -99,7 +99,9 @@ const getEmployerProfile = async (req, res) => {
                 social_linkedin,
                 social_facebook,
                 social_twitter,
-                follower_count  -- 👈 THÊM CỘT NÀY
+                follower_count,
+                COALESCE(is_banned, false) AS is_banned,
+                ban_reason
             FROM users 
             WHERE id = $1 AND role = 'employer'`,
             [employerId]
@@ -109,7 +111,17 @@ const getEmployerProfile = async (req, res) => {
             return res.status(404).json({ error: 'Employer not found' });
         }
 
-        res.json(result.rows[0]);
+        const employer = result.rows[0];
+
+        // 👇 ẨN THÔNG TIN NẾU EMPLOYER BỊ BAN
+        if (employer.is_banned) {
+            return res.status(403).json({ 
+                error: 'This employer account has been suspended',
+                reason: employer.ban_reason 
+            });
+        }
+
+        res.json(employer);
     } catch (error) {
         console.error('Error fetching employer profile:', error);
         res.status(500).json({ error: 'Failed to fetch employer profile' });
@@ -123,20 +135,22 @@ const getEmployerJobs = async (req, res) => {
 
         const result = await db.query(
             `SELECT 
-                id, 
-                title, 
-                description, 
-                location, 
-                salary_range, 
-                employment_type, 
-                created_at,
-                deadline
-            FROM jobs 
-            WHERE employer_id = $1 
-                AND status = 'active' 
-                AND (is_hidden = FALSE OR is_hidden IS NULL)
-                AND (deadline IS NULL OR deadline > NOW())
-            ORDER BY created_at DESC`,
+                j.id, 
+                j.title, 
+                j.description, 
+                j.location, 
+                j.salary_range, 
+                j.employment_type, 
+                j.created_at,
+                j.deadline
+            FROM jobs j
+            JOIN users u ON j.employer_id = u.id
+            WHERE j.employer_id = $1 
+              AND j.status = 'active' 
+              AND (j.is_hidden = FALSE OR j.is_hidden IS NULL)
+              AND COALESCE(u.is_banned, false) = false
+              AND (j.deadline IS NULL OR j.deadline > NOW())
+            ORDER BY j.created_at DESC`,
             [employerId]
         );
 
@@ -243,10 +257,11 @@ const getFollowedEmployers = async (req, res) => {
                 u.company_industry,
                 u.follower_count,
                 ef.created_at as followed_at,
-                (SELECT COUNT(*)::int FROM jobs WHERE employer_id = u.id AND status = 'active') as active_jobs
+                (SELECT COUNT(*)::int FROM jobs WHERE employer_id = u.id AND status = 'active' AND (is_hidden = FALSE OR is_hidden IS NULL)) as active_jobs
              FROM employer_followers ef
              JOIN users u ON ef.employer_id = u.id
              WHERE ef.candidate_id = $1
+               AND COALESCE(u.is_banned, false) = false
              ORDER BY ef.created_at DESC`,
             [candidateId]
         );

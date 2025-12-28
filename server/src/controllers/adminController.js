@@ -86,39 +86,92 @@ const toggleBanUser = async (req, res) => {
         const { reason } = req.body;
         const adminId = req.user.id;
 
-        // Check if user exists and is not admin
-        const userCheck = await db.query(
-            'SELECT id, role, is_banned FROM users WHERE id = $1',
-            [userId]
-        );
-
-        if (userCheck.rows.length === 0) {
+        // Check user
+        const userResult = await db.query('SELECT id, role, full_name, company_name, is_banned FROM users WHERE id = $1', [userId]);
+        if (userResult.rows.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
+        const target = userResult.rows[0];
 
-        if (userCheck.rows[0].role === 'admin') {
-            return res.status(403).json({ error: 'Cannot ban admin users' });
-        }
-
-        const currentlyBanned = userCheck.rows[0].is_banned;
-
-        if (!currentlyBanned) {
+        if (!target.is_banned) {
             // Ban user
             await db.query(
                 `UPDATE users 
                  SET is_banned = true, ban_reason = $1, banned_at = NOW(), banned_by = $2
                  WHERE id = $3`,
-                [reason || 'No reason provided', adminId, userId]
+                [reason || 'Violates community guidelines', adminId, userId]
             );
 
-            // Log action
+            // 👇 THÊM: Invalidate tất cả tokens của user bị ban
+            await db.query(
+                `UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1`,
+                [userId]
+            );
+
             await db.query(
                 `INSERT INTO admin_actions (admin_id, action_type, target_type, target_id, reason)
                  VALUES ($1, 'ban_user', 'user', $2, $3)`,
-                [adminId, userId, reason]
+                [adminId, userId, reason || 'Violates community guidelines']
             );
 
-            res.json({ message: 'User banned successfully' });
+            // Nếu là employer, ẩn toàn bộ job và gửi notifications
+            if (target.role === 'employer') {
+                const { createNotification } = require('./notificationController');
+
+                await db.query(
+                    `UPDATE jobs 
+                     SET is_hidden = true, hidden_reason = $1, hidden_at = NOW(), hidden_by = $2
+                     WHERE employer_id = $3`,
+                    ['Employer account banned', adminId, userId]
+                );
+
+                const companyName = target.company_name || 'An employer';
+
+                const followers = await db.query(
+                    'SELECT candidate_id FROM employer_followers WHERE employer_id = $1',
+                    [userId]
+                );
+                
+                const applicants = await db.query(`
+                    SELECT DISTINCT a.candidate_id
+                    FROM applications a
+                    JOIN jobs j ON a.job_id = j.id
+                    WHERE j.employer_id = $1
+                `, [userId]);
+
+                let interviewees = { rows: [] };
+                try {
+                    interviewees = await db.query(`
+                        SELECT DISTINCT candidate_id 
+                        FROM interviews 
+                        WHERE employer_id = $1
+                    `, [userId]);
+                } catch (e) {
+                    console.warn('Interviews table query failed:', e.message);
+                }
+
+                const candidateIds = new Set([
+                    ...followers.rows.map(r => r.candidate_id),
+                    ...applicants.rows.map(r => r.candidate_id),
+                    ...interviewees.rows.map(r => r.candidate_id),
+                ]);
+
+                for (const candidateId of candidateIds) {
+                    await createNotification(
+                        candidateId,
+                        'employer_banned',
+                        '⚠️ Employer Account Suspended',
+                        `${companyName} has been suspended. You may have followed, applied to jobs, or had interviews with this company.`,
+                        `/`
+                    );
+                }
+
+                console.log(`📣 Sent ban notifications to ${candidateIds.size} job seekers`);
+            }
+
+            console.log(`🚫 User ${userId} has been banned and all sessions invalidated`);
+            res.json({ message: 'User banned successfully and logged out from all devices' });
+
         } else {
             // Unban user
             await db.query(
@@ -128,12 +181,20 @@ const toggleBanUser = async (req, res) => {
                 [userId]
             );
 
-            // Log action
             await db.query(
                 `INSERT INTO admin_actions (admin_id, action_type, target_type, target_id, reason)
                  VALUES ($1, 'unban_user', 'user', $2, $3)`,
                 [adminId, userId, 'User unbanned']
             );
+
+            if (target.role === 'employer') {
+                await db.query(
+                    `UPDATE jobs 
+                     SET is_hidden = false, hidden_reason = NULL, hidden_at = NULL, hidden_by = NULL
+                     WHERE employer_id = $1 AND hidden_reason = 'Employer account banned'`,
+                    [userId]
+                );
+            }
 
             res.json({ message: 'User unbanned successfully' });
         }

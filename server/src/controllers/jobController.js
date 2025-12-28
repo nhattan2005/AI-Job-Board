@@ -86,7 +86,6 @@ const updateJob = async (req, res) => {
 // Get all active jobs (Public)
 const getJobs = async (req, res) => {
     try {
-        // 👇 THÊM avatar_url vào SELECT
         const result = await db.query(`
             SELECT 
                 j.*, 
@@ -94,7 +93,9 @@ const getJobs = async (req, res) => {
                 u.avatar_url
             FROM jobs j
             LEFT JOIN users u ON j.employer_id = u.id
-            WHERE j.status = 'active' AND (j.is_hidden = FALSE OR j.is_hidden IS NULL)
+            WHERE j.status = 'active' 
+              AND (j.is_hidden = FALSE OR j.is_hidden IS NULL)
+              AND COALESCE(u.is_banned, false) = false
             ORDER BY j.created_at DESC
         `);
         res.status(200).json(result.rows);
@@ -125,12 +126,12 @@ const getAllJobs = async (req, res) => {
 const getJobById = async (req, res) => {
     const { id } = req.params;
     try {
-        // 👇 THÊM avatar_url vào SELECT
         const result = await db.query(`
             SELECT 
                 j.*, 
                 u.company_name, 
                 u.avatar_url,
+                COALESCE(u.is_banned, false) AS employer_banned,
                 (SELECT COUNT(*)::int FROM applications a WHERE a.job_id = j.id) as application_count
             FROM jobs j 
             JOIN users u ON j.employer_id = u.id 
@@ -140,7 +141,15 @@ const getJobById = async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Job not found' });
         }
-        res.json(result.rows[0]);
+
+        const job = result.rows[0];
+
+        // 👇 ẨN JOB NẾU EMPLOYER BỊ BAN
+        if (job.employer_banned) {
+            return res.status(403).json({ error: 'This job is no longer available' });
+        }
+
+        res.json(job);
     } catch (error) {
         console.error('Error fetching job:', error);
         res.status(500).json({ error: 'Server error' });
