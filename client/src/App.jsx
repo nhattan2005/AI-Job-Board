@@ -37,6 +37,7 @@ import PracticeInterviewSetup from './pages/PracticeInterviewSetup'; // 👈 TH�
 import PracticeInterviewRoom from './pages/PracticeInterviewRoom'; // 👈 THÊM
 import NotificationsPage from './pages/NotificationsPage'; // 👈 THÊM
 import EmployerPublicProfile from './pages/EmployerPublicProfile'; // 👈 THÊM
+import AdminManagement from './pages/AdminManagement'; // 👈 THÊM IMPORT
 
 const App = () => {
     return (
@@ -218,7 +219,24 @@ const App = () => {
                                     </ProtectedRoute>
                                 } 
                             />
-                            <Route path="/admin/banners" element={<AdminBanners />} /> {/* 👈 THÊM */}
+                            <Route 
+                                path="/admin/banners" 
+                                element={
+                                    <ProtectedRoute requiredRole="admin">
+                                        <AdminBanners />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            
+                            {/* 👇 THÊM ROUTE MỚI */}
+                            <Route 
+                                path="/admin/admins" 
+                                element={
+                                    <ProtectedRoute requiredRole="admin">
+                                        <AdminManagement />
+                                    </ProtectedRoute>
+                                } 
+                            />
 
                             <Route path="/privacy-policy" element={<PrivacyPage />} />
                             <Route path="/terms-of-service" element={<TermsPage />} />
