@@ -229,12 +229,42 @@ const checkFollowStatus = async (req, res) => {
     }
 };
 
+// 👇 HÀM MỚI: Get list of employers that user is following
+const getFollowedEmployers = async (req, res) => {
+    try {
+        const candidateId = req.user.id;
+
+        const result = await db.query(
+            `SELECT 
+                u.id, 
+                u.company_name, 
+                u.company_description, 
+                u.avatar_url,
+                u.company_industry,
+                u.follower_count,
+                ef.created_at as followed_at,
+                (SELECT COUNT(*)::int FROM jobs WHERE employer_id = u.id AND status = 'active') as active_jobs
+             FROM employer_followers ef
+             JOIN users u ON ef.employer_id = u.id
+             WHERE ef.candidate_id = $1
+             ORDER BY ef.created_at DESC`,
+            [candidateId]
+        );
+
+        res.json({ employers: result.rows });
+    } catch (error) {
+        console.error('Error fetching followed employers:', error);
+        res.status(500).json({ error: 'Failed to fetch followed employers' });
+    }
+};
+
 module.exports = {
     getEmployerStats,
     getAllApplications,
     getEmployerProfile,
     getEmployerJobs,
-    followEmployer,      // 👈 EXPORT
-    unfollowEmployer,    // 👈 EXPORT
-    checkFollowStatus    // 👈 EXPORT
+    followEmployer,
+    unfollowEmployer,
+    checkFollowStatus,
+    getFollowedEmployers  // 👈 EXPORT MỚI
 };

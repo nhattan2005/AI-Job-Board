@@ -3,7 +3,7 @@ const { extractTextFromFile } = require('../utils/pdfExtractor');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 const multer = require('multer');
 const { createNotification } = require('./notificationController');
-const cloudinary = require('../config/cloudinary'); // 👈 THÊM DÒNG NÀY
+const { cloudinary } = require('../config/cloudinary'); // 👈 SỬA: Import đúng cách
 
 // 👇 DÙNG MEMORY STORAGE (Lưu vào RAM trước)
 const storage = multer.memoryStorage();
@@ -334,21 +334,27 @@ const downloadCV = async (req, res) => {
             return res.status(404).json({ error: 'CV file not found' });
         }
 
-        // 👇 THÊM: Sanitize URL + Force download với fl_attachment
-        const cleanUrl = file_path.trim().replace(/\s+/g, '');
+        // 👇 GIẢI PHÁP ĐƠN GIẢN & ỔN ĐỊNH NHẤT:
+        // Không tạo lại signed URL. Dùng URL gốc và chèn 'fl_attachment'.
         
-        // 👇 THÊM: Cloudinary transformation để force download
-        const downloadUrl = cleanUrl.replace(
-            '/upload/',
-            `/upload/fl_attachment:${encodeURIComponent(filename)}/`
-        );
-        
-        console.log(`✅ Returning download URL: ${downloadUrl}`);
+        let downloadUrl = file_path;
+
+        // 1. Chèn fl_attachment vào sau /upload/ để ép trình duyệt tải về
+        // (Tránh lỗi "Customer is marked as untrusted" khi xem trực tiếp)
+        if (downloadUrl.includes('/upload/') && !downloadUrl.includes('fl_attachment')) {
+            downloadUrl = downloadUrl.replace('/upload/', '/upload/fl_attachment/');
+        }
+
+        // 2. Đảm bảo URL được encode đúng (xử lý khoảng trắng trong tên file)
+        // encodeURI sẽ chuyển "CV - Phan Nhat Tan.pdf" thành "CV%20-%20Phan%20Nhat%20Tan.pdf"
+        // nhưng giữ nguyên các ký tự của URL (/, :, etc.)
+        downloadUrl = encodeURI(downloadUrl);
+
+        console.log(`✅ Generated direct download URL: ${downloadUrl}`);
         
         res.json({
             url: downloadUrl,
-            filename: filename,
-            forceDownload: true  // Flag để Frontend biết là download
+            filename: filename
         });
 
     } catch (error) {

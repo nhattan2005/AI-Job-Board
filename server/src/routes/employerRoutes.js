@@ -5,9 +5,10 @@ const {
     getAllApplications, 
     getEmployerProfile, 
     getEmployerJobs,
-    followEmployer,      // 👈 THÊM
-    unfollowEmployer,    // 👈 THÊM
-    checkFollowStatus    // 👈 THÊM
+    followEmployer,
+    unfollowEmployer,
+    checkFollowStatus,
+    getFollowedEmployers  // 👈 THÊM
 } = require('../controllers/employerController');
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.get('/profile/:employerId/jobs', getEmployerJobs);
 router.post('/follow/:employerId', verifyToken, verifyCandidate, followEmployer);
 router.delete('/unfollow/:employerId', verifyToken, verifyCandidate, unfollowEmployer);
 router.get('/follow-status/:employerId', verifyToken, verifyCandidate, checkFollowStatus);
+router.get('/following', verifyToken, verifyCandidate, getFollowedEmployers); // 👈 THÊM ROUTE MỚI
 
 // Protected routes (cần auth)
 router.get('/stats', verifyToken, verifyEmployer, getEmployerStats);

@@ -25,6 +25,7 @@ import InterviewFeedback from './pages/InterviewFeedback';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import EmailVerifiedPage from './pages/EmailVerifiedPage';
 import VerifyEmailSentPage from './pages/VerifyEmailSentPage';
+import MyFollowing from './pages/MyFollowing';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminJobs from './pages/AdminJobs';
@@ -224,6 +225,16 @@ const App = () => {
 
                             {/* 👇 THÊM ROUTE MỚI */}
                             <Route path="/employer/:employerId" element={<EmployerPublicProfile />} />
+
+                            {/* 👇 THÊM ROUTE MY FOLLOWING */}
+                            <Route 
+                                path="/my-following" 
+                                element={
+                                    <ProtectedRoute requiredRole="candidate">
+                                        <MyFollowing />
+                                    </ProtectedRoute>
+                                } 
+                            />
 
                             {/* 404 Page */}
                             <Route path="*" element={<h1>404 Not Found</h1>} />
