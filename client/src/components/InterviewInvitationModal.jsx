@@ -102,10 +102,10 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
                 locationDetails += `\n- Meeting Link: ${meetingLink}`;
             }
 
-            await api.post('/employer/send-bulk-email', {
+            // 👇 SỬA: Đổi '/employer/...' thành '/employer-email/...'
+            await api.post('/employer-email/send-bulk-email', {
                 applicationIds: [application.id],
                 subject: `Interview Invitation - ${jobTitle}`,
-                // 👇 SỬA LẠI PHẦN NÀY: Dùng thẻ <b> thay vì **
                 message: `Dear ${application.candidate_name},
 
 We are impressed with your application and would like to invite you for an interview.
