@@ -553,6 +553,112 @@ const uploadAvatar = async (req, res) => {
     }
 };
 
+// Forgot password - Send reset link
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const result = await db.query('SELECT id, email, full_name FROM users WHERE email = $1', [email]);
+
+        if (result.rows.length === 0) {
+            // Không tiết lộ email không tồn tại (security)
+            return res.json({ message: 'If that email exists, a reset link has been sent' });
+        }
+
+        const user = result.rows[0];
+
+        // Generate reset token
+        const { generateVerificationToken, sendPasswordResetEmail } = require('../utils/emailVerification');
+        const resetToken = generateVerificationToken();
+        const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        // Save token to database
+        await db.query(
+            'UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3',
+            [resetToken, resetExpires, user.id]
+        );
+
+        // Send email
+        const emailResult = await sendPasswordResetEmail(email, resetToken);
+
+        if (!emailResult.success) {
+            return res.status(500).json({ error: 'Failed to send reset email' });
+        }
+
+        res.json({ message: 'Password reset link sent successfully' });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ error: 'Failed to process request' });
+    }
+};
+
+// Validate reset token
+const validateResetToken = async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        const result = await db.query(
+            'SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        res.json({ message: 'Token is valid' });
+    } catch (error) {
+        console.error('Validate reset token error:', error);
+        res.status(500).json({ error: 'Failed to validate token' });
+    }
+};
+
+// Reset password with token
+const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: 'Token and new password are required' });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+
+        // Check token validity
+        const result = await db.query(
+            'SELECT id FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()',
+            [token]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({ error: 'Invalid or expired reset token' });
+        }
+
+        const userId = result.rows[0].id;
+
+        // Hash new password
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+
+        // Update password and clear reset token
+        await db.query(
+            'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2',
+            [passwordHash, userId]
+        );
+
+        console.log('✅ Password reset successfully for user:', userId);
+        res.json({ message: 'Password reset successfully' });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Failed to reset password' });
+    }
+};
+
 module.exports = {
     register,
     verifyEmailOTP,
@@ -562,5 +668,8 @@ module.exports = {
     getProfile,
     updateProfile,
     changePassword,
-    uploadAvatar
+    uploadAvatar,
+    forgotPassword,        // 👈 THÊM
+    validateResetToken,    // 👈 THÊM
+    resetPassword          // 👈 THÊM
 };

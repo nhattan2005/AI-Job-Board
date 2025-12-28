@@ -102,7 +102,7 @@ const toggleBanUser = async (req, res) => {
                 [reason || 'Violates community guidelines', adminId, userId]
             );
 
-            // 👇 THÊM: Invalidate tất cả tokens của user bị ban
+            // Invalidate tất cả tokens
             await db.query(
                 `UPDATE users SET token_version = COALESCE(token_version, 0) + 1 WHERE id = $1`,
                 [userId]
@@ -113,6 +113,43 @@ const toggleBanUser = async (req, res) => {
                  VALUES ($1, 'ban_user', 'user', $2, $3)`,
                 [adminId, userId, reason || 'Violates community guidelines']
             );
+
+            // 👇 THÊM: Nếu là candidate, ẩn applications và thông báo cho employers
+            if (target.role === 'candidate') {
+                const { createNotification } = require('./notificationController');
+
+                const candidateName = target.full_name || 'A candidate';
+
+                // 1. Ẩn tất cả applications của candidate
+                await db.query(
+                    `UPDATE applications 
+                     SET is_hidden = true, hidden_reason = $1, hidden_at = NOW()
+                     WHERE candidate_id = $2`,
+                    ['Candidate account banned', userId]
+                );
+
+                // 2. Lấy danh sách employers mà candidate đã apply job
+                const employersResult = await db.query(`
+                    SELECT DISTINCT j.employer_id, u.company_name, j.title as job_title
+                    FROM applications a
+                    JOIN jobs j ON a.job_id = j.id
+                    JOIN users u ON j.employer_id = u.id
+                    WHERE a.candidate_id = $1
+                `, [userId]);
+
+                // 3. Gửi notification cho từng employer
+                for (const employer of employersResult.rows) {
+                    await createNotification(
+                        employer.employer_id,
+                        'candidate_banned',
+                        '⚠️ Applicant Account Suspended',
+                        `${candidateName} who applied for "${employer.job_title}" has been suspended. Their application is no longer visible.`,
+                        `/employer/dashboard`
+                    );
+                }
+
+                console.log(`📣 Sent ban notifications to ${employersResult.rows.length} employers`);
+            }
 
             // Nếu là employer, ẩn toàn bộ job và gửi notifications
             if (target.role === 'employer') {
@@ -187,6 +224,17 @@ const toggleBanUser = async (req, res) => {
                 [adminId, userId, 'User unbanned']
             );
 
+            // Unhide applications khi unban candidate
+            if (target.role === 'candidate') {
+                await db.query(
+                    `UPDATE applications 
+                     SET is_hidden = false, hidden_reason = NULL, hidden_at = NULL
+                     WHERE candidate_id = $1 AND hidden_reason = 'Candidate account banned'`,
+                    [userId]
+                );
+            }
+
+            // Unhide jobs khi unban employer
             if (target.role === 'employer') {
                 await db.query(
                     `UPDATE jobs 

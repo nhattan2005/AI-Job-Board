@@ -8,6 +8,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Import đầy đủ các Pages & Components
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';   // 👈 THÊM
+import ResetPasswordPage from './pages/ResetPasswordPage';     // 👈 THÊM
 import JobList from './components/JobList';
 import JobDetail from './components/JobDetail';
 import JobForm from './components/JobForm';
@@ -55,6 +57,10 @@ const App = () => {
                             <Route path="/verify-email" element={<VerifyEmailPage />} />
                             <Route path="/verify-email-sent" element={<VerifyEmailSentPage />} />
                             <Route path="/email-verified" element={<EmailVerifiedPage />} />
+                            
+                            {/* 👇 THÊM 2 ROUTES MỚI */}
+                            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
                             {/* 👇 THÊM ROUTE NÀY - QUAN TRỌNG! */}
                             <Route 

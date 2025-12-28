@@ -428,6 +428,21 @@ ADD COLUMN IF NOT EXISTS skill_gap JSONB;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0;
 COMMENT ON COLUMN users.token_version IS 'Increment this to invalidate all existing tokens';
 
+-- Thêm cột is_hidden cho applications (ẩn application khi candidate bị ban)
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT FALSE;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS hidden_reason TEXT;
+ALTER TABLE applications ADD COLUMN IF NOT EXISTS hidden_at TIMESTAMP;
+
+COMMENT ON COLUMN applications.is_hidden IS 'Hide application when candidate is banned';
+COMMENT ON COLUMN applications.hidden_reason IS 'Reason for hiding application';
+
+-- Thêm cột reset_token cho forgot password
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP;
+
+COMMENT ON COLUMN users.reset_token IS 'Token for password reset';
+COMMENT ON COLUMN users.reset_token_expires IS 'Expiration time for reset token';
+
 -- Verify
 SELECT column_name, data_type 
 FROM information_schema.columns 

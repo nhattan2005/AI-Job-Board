@@ -88,7 +88,8 @@ const Navigation = () => {
                                     <>
                                         <NavLink to="/employer/dashboard">Dashboard</NavLink>
                                         <NavLink to="/employer/post-job">Post Job</NavLink>
-                                        <NavLink to="/employer/all-applications">Applications</NavLink>
+                                        {/* ẨN NÚT APPLICATIONS - Chỉ truy cập qua Dashboard */}
+                                        {/* <NavLink to="/employer/all-applications">Applications</NavLink> */}
                                     </>
                                 )}
 
