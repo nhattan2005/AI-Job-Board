@@ -101,9 +101,9 @@ const App = () => {
                                 } 
                             />
 
-                            {/* AI Interview Routes */}
+                            {/* 👇 SỬA: Route đúng cho trang xếp lịch phỏng vấn */}
                             <Route 
-                                path="/interview/:jobId/:interviewType" 
+                                path="/interview/schedule/:applicationId" 
                                 element={
                                     <ProtectedRoute requiredRole="candidate">
                                         <InterviewSchedulePage />
