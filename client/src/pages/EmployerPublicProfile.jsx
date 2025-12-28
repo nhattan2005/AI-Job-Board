@@ -27,6 +27,7 @@ const EmployerPublicProfile = () => {
     const fetchEmployerProfile = async () => {
         try {
             setLoading(true);
+            setError(null);
             const [employerRes, jobsRes] = await Promise.all([
                 api.get(`/employer/profile/${employerId}`),
                 api.get(`/employer/profile/${employerId}/jobs`)
@@ -35,7 +36,14 @@ const EmployerPublicProfile = () => {
             setJobs(jobsRes.data);
         } catch (err) {
             console.error('Error fetching employer profile:', err);
-            setError('Không thể tải thông tin công ty');
+            const errorMsg = err.response?.data?.error || 'Failed to load company profile';
+            
+            // 👇 THÊM: Hiển thị thông báo rõ ràng khi employer bị ban
+            if (err.response?.status === 403 && errorMsg.includes('suspended')) {
+                setError('⚠️ This company account has been suspended. Its profile and job postings are no longer visible.');
+            } else {
+                setError('Failed to load company profile');
+            }
         } finally {
             setLoading(false);
         }

@@ -157,6 +157,7 @@ const getMyApplications = async (req, res) => {
             JOIN jobs j ON a.job_id = j.id
             JOIN users u ON j.employer_id = u.id
             WHERE a.candidate_id = $1
+              AND COALESCE(u.is_banned, false) = false
             ORDER BY a.applied_at DESC
         `, [candidate_id]);
 

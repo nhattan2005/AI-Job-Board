@@ -23,7 +23,6 @@ const LoginPage = () => {
         try {
             const user = await login(email, password);
             
-            // 👇 SỬA: Thêm check role admin
             if (user.role === 'admin') {
                 navigate('/admin/dashboard');
             } else if (user.role === 'employer') {
@@ -34,7 +33,10 @@ const LoginPage = () => {
         } catch (err) {
             const errorData = err.response?.data;
             
-            if (errorData?.error === 'Email not verified') {
+            // 👇 THÊM: Xử lý trường hợp account bị ban
+            if (errorData?.isBanned || errorData?.error === 'Account Suspended') {
+                setError(errorData.message || 'Your account has been suspended. Please contact support.');
+            } else if (errorData?.error === 'Email not verified') {
                 setUnverifiedEmail(errorData.email || email);
                 setShowResendVerification(true);
                 setError('Your email is not verified. Please verify your email to continue.');

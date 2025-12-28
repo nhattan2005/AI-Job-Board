@@ -315,34 +315,43 @@ const login = async (req, res) => {
         const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
 
         if (result.rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
         const user = result.rows[0];
 
-        // 👇 THÊM ĐOẠN NÀY
-        // Check if user is banned
+        // 👇 KIỂM TRA BAN TRƯỚC KHI VERIFY PASSWORD
         if (user.is_banned) {
+            console.log(`🚫 Banned user attempted login: ${email}`);
             return res.status(403).json({ 
-                error: 'Account suspended', 
-                details: user.ban_reason || 'Your account has been suspended by administrators.'
+                error: 'Account Suspended',
+                message: `Your account has been suspended. Reason: ${user.ban_reason || 'Violates community guidelines'}. Please contact support if you believe this is an error.`,
+                isBanned: true
             });
         }
 
         // Check email verification
         if (!user.email_verified) {
-            return res.status(403).json({ error: 'Please verify your email before logging in' });
+            return res.status(403).json({ 
+                error: 'Email not verified',
+                email: user.email
+            });
         }
 
         const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
         if (!passwordMatch) {
-            return res.status(401).json({ error: 'Invalid credentials' });
+            return res.status(401).json({ error: 'Invalid email or password' });
         }
 
-        // 👇 SỬA: Đổi 'id' thành 'userId'
+        // 👇 THÊM token_version vào JWT payload
         const token = jwt.sign(
-            { userId: user.id, email: user.email, role: user.role }, // ← SỬA ĐÂY
+            { 
+                userId: user.id, 
+                email: user.email, 
+                role: user.role,
+                tokenVersion: user.token_version || 0 // 👈 THÊM
+            },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
