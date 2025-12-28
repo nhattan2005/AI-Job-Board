@@ -33,7 +33,8 @@ const EmailTemplateModal = ({ isOpen, onClose, selectedApplicationIds = [], onSe
         setError(null);
 
         try {
-            const response = await axios.post('/api/employer/send-bulk-email', {
+            // 👇 SỬA: Đổi '/api/employer/...' thành '/api/employer-email/...'
+            const response = await axios.post('/api/employer-email/send-bulk-email', {
                 applicationIds: selectedApplicationIds,
                 subject: subject,
                 message: message

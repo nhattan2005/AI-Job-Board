@@ -186,7 +186,7 @@ const InterviewSchedulePage = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         <div>
-                            <p className="text-sm text-gray-600">Location</p>
+                            <p className="text-sm text-gray-600">Method/Location</p>
                             <p className="font-semibold text-gray-800">{interview?.location}</p>
                         </div>
                     </div>
