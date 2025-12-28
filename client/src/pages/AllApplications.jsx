@@ -37,6 +37,25 @@ const AllApplications = () => {
         }
     };
 
+    const handleDownloadCV = async (applicationId) => {
+        try {
+            console.log(`📥 Downloading CV for application ${applicationId}`);
+            
+            const response = await api.get(`/applications/${applicationId}/download-cv`);
+            
+            const { url, filename } = response.data;
+            
+            console.log(`✅ CV URL received: ${url}`);
+            
+            // Mở trong tab mới
+            window.open(url, '_blank');
+            
+        } catch (error) {
+            console.error('❌ Download CV error:', error);
+            alert('Failed to download CV. Please try again.');
+        }
+    };
+
     const getStatusColor = (status) => {
         switch (status) {
             case 'pending':
@@ -224,6 +243,12 @@ const AllApplications = () => {
                                                     </button>
                                                 </>
                                             )}
+                                            <button
+                                                onClick={() => handleDownloadCV(app.id)}
+                                                className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition text-sm font-semibold"
+                                            >
+                                                Download CV
+                                            </button>
                                         </div>
                                     </div>
                                 ))}

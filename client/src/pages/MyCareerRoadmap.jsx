@@ -7,6 +7,8 @@ const MyCareerRoadmap = () => {
     const [targetRole, setTargetRole] = useState('');
     const [loading, setLoading] = useState(true);
     const [progress, setProgress] = useState(0);
+    const [currentPositioning, setCurrentPositioning] = useState(null);  // 👈 THÊM
+    const [skillGap, setSkillGap] = useState(null);                      // 👈 THÊM
 
     useEffect(() => {
         fetchRoadmap();
@@ -18,6 +20,8 @@ const MyCareerRoadmap = () => {
             if (res.data.roadmap) {
                 setRoadmap(res.data.roadmap);
                 setTargetRole(res.data.target_role);
+                setCurrentPositioning(res.data.current_positioning);  // 👈 THÊM
+                setSkillGap(res.data.skill_gap);                      // 👈 THÊM
                 calculateProgress(res.data.roadmap);
             }
         } catch (error) {
@@ -81,12 +85,76 @@ const MyCareerRoadmap = () => {
             </Link>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                {/* LEFT COLUMN: Header & Roadmap Items */}
+                {/* LEFT COLUMN: Header + Current Positioning + Skill Gap + Roadmap */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* Header */}
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-2">My Career Roadmap</h1>
                         <p className="text-slate-600 text-lg">Target Role: <span className="font-bold text-blue-600">{targetRole}</span></p>
                     </div>
+
+                    {/* 👇 THÊM: CURRENT POSITIONING CARD */}
+                    {currentPositioning && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center">
+                                <span className="bg-blue-100 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center mr-3 text-xl">
+                                    📍
+                                </span>
+                                Current Positioning
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                    <p className="text-sm text-slate-600 mb-1">Role</p>
+                                    <p className="text-lg font-bold text-slate-900">{currentPositioning.role}</p>
+                                </div>
+                                <div className="bg-green-50 p-4 rounded-lg">
+                                    <p className="text-sm text-slate-600 mb-1">Level</p>
+                                    <p className="text-lg font-bold text-slate-900">{currentPositioning.level}</p>
+                                </div>
+                                <div className="bg-purple-50 p-4 rounded-lg">
+                                    <p className="text-sm text-slate-600 mb-1">Salary Potential</p>
+                                    <p className="text-lg font-bold text-slate-900">{currentPositioning.salary_potential}</p>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg">
+                                <p className="text-sm text-slate-600 mb-2 font-semibold">Summary</p>
+                                <p className="text-slate-700 leading-relaxed">{currentPositioning.summary}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 👇 THÊM: SKILL GAP ANALYSIS CARD */}
+                    {skillGap && skillGap.length > 0 && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                            <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center">
+                                <span className="bg-orange-100 text-orange-600 rounded-full w-10 h-10 flex items-center justify-center mr-3 text-xl">
+                                    📊
+                                </span>
+                                Skill Gap Analysis
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {skillGap.map((skill, index) => (
+                                    <div key={index} className="border-l-4 border-orange-500 bg-orange-50 p-4 rounded-r-lg">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="font-bold text-slate-900">{skill.skill}</h4>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                                skill.priority?.toLowerCase() === 'high' 
+                                                    ? 'bg-red-100 text-red-800' 
+                                                    : skill.priority?.toLowerCase() === 'medium' 
+                                                    ? 'bg-yellow-100 text-yellow-800' 
+                                                    : 'bg-green-100 text-green-800'
+                                            }`}>
+                                                {skill.priority} Priority
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-slate-600">
+                                            Status: <span className="font-semibold text-orange-700">{skill.status}</span>
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Roadmap List */}
                     <div className="space-y-6">
@@ -149,7 +217,6 @@ const MyCareerRoadmap = () => {
                 </div>
 
                 {/* RIGHT COLUMN: Sticky Progress Card */}
-                {/* 'sticky top-24' giúp nó dính lại khi cuộn */}
                 <div className="lg:col-span-1 sticky top-24 order-first lg:order-last mb-6 lg:mb-0">
                     <div className="bg-white p-6 rounded-2xl shadow-soft border border-slate-100">
                         <h3 className="font-bold text-slate-800 mb-4 text-lg">Your Progress</h3>

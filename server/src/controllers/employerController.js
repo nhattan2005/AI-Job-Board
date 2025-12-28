@@ -98,7 +98,8 @@ const getEmployerProfile = async (req, res) => {
                 company_benefits,
                 social_linkedin,
                 social_facebook,
-                social_twitter
+                social_twitter,
+                follower_count  -- 👈 THÊM CỘT NÀY
             FROM users 
             WHERE id = $1 AND role = 'employer'`,
             [employerId]
@@ -146,9 +147,94 @@ const getEmployerJobs = async (req, res) => {
     }
 };
 
+// 👇 HÀM MỚI: Follow Employer
+const followEmployer = async (req, res) => {
+    try {
+        const candidateId = req.user.id;
+        const { employerId } = req.params;
+
+        // Check if employer exists
+        const employerCheck = await db.query(
+            'SELECT id FROM users WHERE id = $1 AND role = $2',
+            [employerId, 'employer']
+        );
+
+        if (employerCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Employer not found' });
+        }
+
+        // Insert follow
+        await db.query(
+            'INSERT INTO employer_followers (employer_id, candidate_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [employerId, candidateId]
+        );
+
+        // Update follower_count
+        await db.query(
+            `UPDATE users 
+             SET follower_count = (SELECT COUNT(*) FROM employer_followers WHERE employer_id = $1) 
+             WHERE id = $1`,
+            [employerId]
+        );
+
+        res.json({ message: 'Followed successfully' });
+    } catch (error) {
+        console.error('Error following employer:', error);
+        res.status(500).json({ error: 'Failed to follow employer' });
+    }
+};
+
+// 👇 HÀM MỚI: Unfollow Employer
+const unfollowEmployer = async (req, res) => {
+    try {
+        const candidateId = req.user.id;
+        const { employerId } = req.params;
+
+        // Delete follow
+        await db.query(
+            'DELETE FROM employer_followers WHERE employer_id = $1 AND candidate_id = $2',
+            [employerId, candidateId]
+        );
+
+        // Update follower_count
+        await db.query(
+            `UPDATE users 
+             SET follower_count = (SELECT COUNT(*) FROM employer_followers WHERE employer_id = $1) 
+             WHERE id = $1`,
+            [employerId]
+        );
+
+        res.json({ message: 'Unfollowed successfully' });
+    } catch (error) {
+        console.error('Error unfollowing employer:', error);
+        res.status(500).json({ error: 'Failed to unfollow employer' });
+    }
+};
+
+// 👇 HÀM MỚI: Check Follow Status
+const checkFollowStatus = async (req, res) => {
+    try {
+        const candidateId = req.user.id;
+        const { employerId } = req.params;
+
+        const result = await db.query(
+            'SELECT id FROM employer_followers WHERE employer_id = $1 AND candidate_id = $2',
+            [employerId, candidateId]
+        );
+
+        res.json({ isFollowing: result.rows.length > 0 });
+    } catch (error) {
+        console.error('Error checking follow status:', error);
+        res.status(500).json({ error: 'Failed to check follow status' });
+    }
+};
+
 module.exports = {
     getEmployerStats,
     getAllApplications,
     getEmployerProfile,
-    getEmployerJobs
+    getEmployerJobs,
+    followEmployer,      // 👈 EXPORT
+    unfollowEmployer,    // 👈 EXPORT
+    checkFollowStatus    // 👈 EXPORT
 };

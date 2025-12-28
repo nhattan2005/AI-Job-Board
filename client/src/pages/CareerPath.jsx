@@ -84,8 +84,10 @@ const CareerPath = () => {
         setSaving(true);
         try {
             await api.post('/career/save', {
-                target_role: result.current_positioning.role, // Hoặc lấy từ path được chọn
-                roadmap: result.roadmap
+                target_role: result.current_positioning.role,
+                roadmap: result.roadmap,
+                current_positioning: result.current_positioning,  // 👈 THÊM
+                skill_gap: result.skill_gap                       // 👈 THÊM
             });
             // Chuyển hướng sang trang My Roadmap
             navigate('/my-roadmap');

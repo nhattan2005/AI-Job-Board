@@ -327,9 +327,9 @@ INSERT INTO interview_time_slots (interview_id, slot_date, is_selected) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Sample Mock Interviews
-INSERT INTO mock_interviews (user_id, job_id, interview_type, chat_history, audio_metrics, overall_score, final_feedback, status) VALUES
-(1, 1, 'HR', '[{"role": "user", "text": "Tell me about yourself.", "timestamp": "2024-12-01T10:00:00Z"}, {"role": "model", "text": "I am a full-stack developer...", "timestamp": "2024-12-01T10:00:05Z"}]', '{"hesitation_count": 2, "wpm_avg": 150, "total_duration": 120}', 75, 'Good communication, but needs to improve technical details.', 'active'),
-(2, 2, 'Tech_Lead', '[{"role": "user", "text": "What is your experience with React?", "timestamp": "2024-12-02T14:00:00Z"}, {"role": "model", "text": "I have 4 years of experience...", "timestamp": "2024-12-02T14:00:05Z"}]', '{"hesitation_count": 1, "wpm_avg": 160, "total_duration": 90}', 85, 'Strong React knowledge, good problem-solving skills.', 'active')
+INSERT INTO mock_interviews (user_id, job_id, interview_type, chat_history, fluency_data, overall_score, final_feedback, status) VALUES
+(1, 1, 'HR', '[{"role": "user", "text": "Tell me about yourself.", "timestamp": "2024-12-01T10:00:00Z"}, {"role": "model", "text": "I am a full-stack developer...", "timestamp": "2024-12-01T10:00:05Z"}]'::jsonb, '{"hesitation_count": 2, "wpm_avg": 150, "total_duration": 120}'::jsonb, 75, '{"overall_score": 75, "strengths": ["Clear communication"], "weaknesses": ["Needs more technical depth"], "recommendation": "Maybe"}'::jsonb, 'active'),
+(2, 2, 'Tech_Lead', '[{"role": "user", "text": "What is your experience with React?", "timestamp": "2024-12-02T14:00:00Z"}, {"role": "model", "text": "I have 4 years of experience...", "timestamp": "2024-12-02T14:00:05Z"}]'::jsonb, '{"hesitation_count": 1, "wpm_avg": 160, "total_duration": 90}'::jsonb, 85, '{"overall_score": 85, "strengths": ["Strong React knowledge", "Good problem-solving"], "weaknesses": ["Could improve system design"], "recommendation": "Hire"}'::jsonb, 'active')
 ON CONFLICT (session_id) DO NOTHING;
 
 -- Đánh dấu tài khoản admin đã verified
@@ -391,9 +391,43 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- Create index for faster queries
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_is_read ON notifications(is_read);
-CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+
+-- 1. Tạo table followers
+CREATE TABLE IF NOT EXISTS employer_followers (
+    id SERIAL PRIMARY KEY,
+    employer_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    candidate_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(employer_id, candidate_id) -- Mỗi candidate chỉ follow 1 lần
+);
+
+CREATE INDEX IF NOT EXISTS idx_followers_employer ON employer_followers(employer_id);
+CREATE INDEX IF NOT EXISTS idx_followers_candidate ON employer_followers(candidate_id);
+
+-- 2. Thêm follower_count vào users (cache count)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS follower_count INT DEFAULT 0;
+
+-- 3. Cập nhật follower_count cho tất cả employers hiện có
+UPDATE users 
+SET follower_count = (
+    SELECT COUNT(*) 
+    FROM employer_followers 
+    WHERE employer_id = users.id
+)
+WHERE role = 'employer';
+
+-- Thêm 2 cột mới vào bảng user_roadmaps
+ALTER TABLE user_roadmaps 
+ADD COLUMN IF NOT EXISTS current_positioning JSONB,
+ADD COLUMN IF NOT EXISTS skill_gap JSONB;
+
+-- Verify
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'user_roadmaps';
 
 -- Success message
 DO $$ 

@@ -2,7 +2,8 @@ const db = require('../config/database');
 const { extractTextFromFile } = require('../utils/pdfExtractor');
 const { uploadToCloudinary } = require('../services/cloudinaryService');
 const multer = require('multer');
-const { createNotification } = require('./notificationController'); // 👈 THÊM IMPORT
+const { createNotification } = require('./notificationController');
+const cloudinary = require('../config/cloudinary'); // 👈 THÊM DÒNG NÀY
 
 // 👇 DÙNG MEMORY STORAGE (Lưu vào RAM trước)
 const storage = multer.memoryStorage();
@@ -46,7 +47,11 @@ const applyForJob = async (req, res) => {
         // 2. Upload file lên Cloudinary
         const cloudResult = await uploadToCloudinary(req.file.buffer, req.file.originalname, candidate_id);
         const filePath = cloudResult.secure_url;
-        console.log('✅ CV file uploaded to Cloudinary:', filePath);
+
+        // 👇 THÊM: Sanitize URL (loại bỏ ký tự xuống dòng, space thừa)
+        const cleanFilePath = filePath.trim().replace(/\s+/g, '');
+
+        console.log('✅ CV file uploaded to Cloudinary:', cleanFilePath);
 
         // 3. Lấy thông tin job (để kiểm tra)
         const jobResult = await db.query('SELECT id, title, description FROM jobs WHERE id = $1', [job_id]);
@@ -59,12 +64,11 @@ const applyForJob = async (req, res) => {
         // 👇 4. KIỂM TRA CV ĐÃ TỒN TẠI CHƯA
         let cv_id;
         const existingCVResult = await db.query(
-            'SELECT id FROM cvs WHERE candidate_id = $1 LIMIT 1', // 👈 KHÔNG CẦN is_active
+            'SELECT id FROM cvs WHERE candidate_id = $1 LIMIT 1',
             [candidate_id]
         );
 
         if (existingCVResult.rows.length > 0) {
-            // 👇 CV ĐÃ TỒN TẠI → CẬP NHẬT
             cv_id = existingCVResult.rows[0].id;
             console.log('📝 CV already exists, updating ID:', cv_id);
 
@@ -72,7 +76,7 @@ const applyForJob = async (req, res) => {
                 `UPDATE cvs 
                  SET filename = $1, cv_text = $2, file_path = $3, created_at = CURRENT_TIMESTAMP 
                  WHERE id = $4`,
-                [req.file.originalname, cvText, filePath, cv_id]
+                [req.file.originalname, cvText, cleanFilePath, cv_id] // 👈 DÙNG cleanFilePath
             );
             console.log('✅ CV updated successfully');
         } else {
@@ -81,7 +85,7 @@ const applyForJob = async (req, res) => {
                 `INSERT INTO cvs (candidate_id, filename, cv_text, file_path) 
                  VALUES ($1, $2, $3, $4) 
                  RETURNING id`,
-                [candidate_id, req.file.originalname, cvText, filePath]
+                [candidate_id, req.file.originalname, cvText, cleanFilePath] // 👈 DÙNG cleanFilePath
             );
             cv_id = cvResult.rows[0].id;
             console.log('✅ CV created, ID:', cv_id);
@@ -302,61 +306,50 @@ const checkApplicationStatus = async (req, res) => {
 
 // 👇 HÀM MỚI: Download CV với signed URL
 const downloadCV = async (req, res) => {
-    const { applicationId } = req.params;
-    const employer_id = req.user.id;
-
     try {
-        // Verify employer has access to this application
-        const appResult = await db.query(`
-            SELECT a.id, c.file_path, c.filename, j.employer_id
-            FROM applications a
-            JOIN jobs j ON a.job_id = j.id
-            LEFT JOIN cvs c ON a.cv_id = c.id
-            WHERE a.id = $1
-        `, [applicationId]);
+        const { applicationId } = req.params;
+        const employerId = req.user.id;
 
-        if (appResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Application not found' });
+        console.log(`📥 Download CV request: applicationId=${applicationId}, employerId=${employerId}`);
+
+        // Get application with CV details
+        const result = await db.query(
+            `SELECT c.file_path, c.filename, a.job_id, j.employer_id
+             FROM applications a
+             JOIN cvs c ON a.cv_id = c.id
+             JOIN jobs j ON a.job_id = j.id
+             WHERE a.id = $1 AND j.employer_id = $2`,
+            [applicationId, employerId]
+        );
+
+        if (result.rows.length === 0) {
+            console.warn(`⚠️ Application ${applicationId} not found or access denied`);
+            return res.status(404).json({ error: 'Application not found or access denied' });
         }
 
-        const app = appResult.rows[0];
+        const { file_path, filename } = result.rows[0];
 
-        // Check permission
-        if (app.employer_id !== employer_id) {
-            return res.status(403).json({ error: 'Access denied' });
-        }
-
-        const file_path = app.file_path;
-
-        if (!file_path || !file_path.includes('cloudinary.com')) {
+        if (!file_path) {
+            console.warn(`⚠️ CV file path is null for application ${applicationId}`);
             return res.status(404).json({ error: 'CV file not found' });
         }
 
-        // Extract public_id từ Cloudinary URL
-        const urlParts = file_path.split('/upload/');
-        if (urlParts.length !== 2) {
-            return res.status(400).json({ error: 'Invalid Cloudinary URL' });
-        }
-
-        const afterUpload = urlParts[1];
-        const versionMatch = afterUpload.match(/^v\d+\//);
-        const publicIdWithExtension = versionMatch 
-            ? afterUpload.substring(versionMatch[0].length)
-            : afterUpload;
-
-        // Generate signed URL (valid for 5 minutes)
-        const signedUrl = cloudinary.url(publicIdWithExtension, {
-            resource_type: 'raw',
-            type: 'upload',
-            sign_url: true,
-            secure: true,
-            expires_at: Math.floor(Date.now() / 1000) + 300 // 5 phút
+        // 👇 THÊM: Sanitize URL + Force download với fl_attachment
+        const cleanUrl = file_path.trim().replace(/\s+/g, '');
+        
+        // 👇 THÊM: Cloudinary transformation để force download
+        const downloadUrl = cleanUrl.replace(
+            '/upload/',
+            `/upload/fl_attachment:${encodeURIComponent(filename)}/`
+        );
+        
+        console.log(`✅ Returning download URL: ${downloadUrl}`);
+        
+        res.json({
+            url: downloadUrl,
+            filename: filename,
+            forceDownload: true  // Flag để Frontend biết là download
         });
-
-        console.log('✅ Generated signed URL for CV:', signedUrl);
-
-        // Redirect đến signed URL
-        res.redirect(signedUrl);
 
     } catch (error) {
         console.error('❌ Download CV error:', error);

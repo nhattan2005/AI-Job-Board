@@ -10,7 +10,12 @@ const EmployerApplications = () => {
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [filter, setFilter] = useState('all');
+    const [filters, setFilters] = useState({
+        status: 'all',
+        minScore: '',
+        skills: '',
+        sortBy: 'applied_at'
+    });
     
     // UI States
     const [viewingCV, setViewingCV] = useState(null);
@@ -29,18 +34,33 @@ const EmployerApplications = () => {
     const fetchJobAndApplications = async () => {
         try {
             setLoading(true);
-            const jobResponse = await api.get(`/jobs/${jobId}`); // ← ĐÚNG
-            setJob(jobResponse.data);
-            
-            const appsResponse = await api.get(`/jobs/${jobId}/applications`); // ← ĐÚNG
-            setApplications(appsResponse.data.applications);
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            setError('Failed to load applications');
+            const [jobRes, appsRes] = await Promise.all([
+                api.get(`/jobs/${jobId}`),
+                api.get(`/jobs/${jobId}/applications`, {
+                    params: {
+                        status: filters.status === 'all' ? undefined : filters.status,
+                        minScore: filters.minScore || undefined,
+                        skills: filters.skills || undefined,
+                        sortBy: filters.sortBy
+                    }
+                })
+            ]);
+            setJob(jobRes.data);
+            setApplications(appsRes.data.applications);
+        } catch (err) {
+            console.error('Error:', err);
+            setError('Failed to load data');
         } finally {
             setLoading(false);
         }
     };
+
+    // Re-fetch khi filters change
+    useEffect(() => {
+        if (jobId) {
+            fetchJobAndApplications();
+        }
+    }, [jobId, filters]); // 👈 THÊM filters vào dependency
 
     const updateApplicationStatus = async (applicationId, newStatus) => {
         try {
@@ -94,6 +114,25 @@ const EmployerApplications = () => {
         }
     };
 
+    const handleDownloadCV = async (applicationId) => {
+        try {
+            console.log(`📥 Downloading CV for application ${applicationId}`);
+            
+            const response = await api.get(`/applications/${applicationId}/download-cv`);
+            
+            const { url, filename } = response.data;
+            
+            console.log(`✅ CV URL received: ${url}`);
+            
+            // 👇 MỞ URL TRONG TAB MỚI (sẽ tự động download nhờ fl_attachment)
+            window.open(url, '_blank');
+            
+        } catch (error) {
+            console.error('❌ Download CV error:', error);
+            alert('Failed to download CV. Please try again.');
+        }
+    };
+
     const toggleExpand = (id) => {
         setExpandedAppId(expandedAppId === id ? null : id);
     };
@@ -119,7 +158,7 @@ const EmployerApplications = () => {
 
     // --- FILTER LOGIC ---
     const filteredApplications = applications.filter(app => 
-        filter === 'all' ? true : app.status === filter
+        filters.status === 'all' ? true : app.status === filters.status
     );
 
     // --- SELECTION LOGIC ---
@@ -162,6 +201,79 @@ const EmployerApplications = () => {
                 </div>
             </div>
 
+            {/* Filter Section */}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">🔍 Filter Candidates</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Status Filter */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
+                        <select
+                            value={filters.status}
+                            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                            <option value="all">All Status</option>
+                            <option value="pending">Pending</option>
+                            <option value="reviewed">Reviewed</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+
+                    {/* Min Score Filter */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Min Match Score</label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={filters.minScore}
+                            onChange={(e) => setFilters({ ...filters, minScore: e.target.value })}
+                            placeholder="e.g. 70"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                    </div>
+
+                    {/* Skills Filter */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Required Skills</label>
+                        <input
+                            type="text"
+                            value={filters.skills}
+                            onChange={(e) => setFilters({ ...filters, skills: e.target.value })}
+                            placeholder="React, Node.js, Python"
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Separate with commas</p>
+                    </div>
+
+                    {/* Sort By */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Sort By</label>
+                        <select
+                            value={filters.sortBy}
+                            onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                            <option value="applied_at">Application Date</option>
+                            <option value="match_score">Match Score</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Reset Button */}
+                <div className="mt-4">
+                    <button
+                        onClick={() => setFilters({ status: 'all', minScore: '', skills: '', sortBy: 'applied_at' })}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                    >
+                        Reset Filters
+                    </button>
+                </div>
+            </div>
+
             {/* Toolbar: Filter & Bulk Actions */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-20 z-10">
                 {/* Filters */}
@@ -169,9 +281,9 @@ const EmployerApplications = () => {
                     {['all', 'pending', 'reviewed', 'interview_scheduled', 'accepted', 'rejected'].map(status => (
                         <button
                             key={status}
-                            onClick={() => setFilter(status)}
+                            onClick={() => setFilters(prev => ({ ...prev, status }))}
                             className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition ${
-                                filter === status
+                                filters.status === status
                                     ? 'bg-slate-800 text-white shadow-md'
                                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                             }`}

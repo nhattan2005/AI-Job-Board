@@ -97,7 +97,7 @@ const generateCareerPath = async (req, res) => {
 const saveRoadmap = async (req, res) => {
     try {
         const userId = req.user.id;
-        const { target_role, roadmap } = req.body;
+        const { target_role, roadmap, current_positioning, skill_gap } = req.body; // 👈 THÊM 2 FIELDS
 
         // Thêm thuộc tính 'completed: false' cho mỗi action trong roadmap nếu chưa có
         const initializedRoadmap = roadmap.map(phase => ({
@@ -109,20 +109,41 @@ const saveRoadmap = async (req, res) => {
         }));
 
         // Kiểm tra xem user đã có roadmap chưa, nếu có thì update, chưa thì insert
-        // Ở đây mình làm đơn giản là mỗi user chỉ có 1 active roadmap.
-        // Nếu muốn nhiều, bạn có thể bỏ đoạn check này.
         const existing = await db.query('SELECT id FROM user_roadmaps WHERE user_id = $1', [userId]);
 
         if (existing.rows.length > 0) {
+            // UPDATE
             await db.query(
-                'UPDATE user_roadmaps SET target_role = $1, roadmap_data = $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $3',
-                [target_role, JSON.stringify(initializedRoadmap), userId]
+                `UPDATE user_roadmaps 
+                 SET target_role = $1, 
+                     roadmap_data = $2, 
+                     current_positioning = $3, 
+                     skill_gap = $4, 
+                     updated_at = CURRENT_TIMESTAMP 
+                 WHERE user_id = $5`,
+                [
+                    target_role, 
+                    JSON.stringify(initializedRoadmap),
+                    JSON.stringify(current_positioning),  // 👈 THÊM
+                    JSON.stringify(skill_gap),             // 👈 THÊM
+                    userId
+                ]
             );
+            console.log('✅ Roadmap updated for user:', userId);
         } else {
+            // INSERT
             await db.query(
-                'INSERT INTO user_roadmaps (user_id, target_role, roadmap_data) VALUES ($1, $2, $3)',
-                [userId, target_role, JSON.stringify(initializedRoadmap)]
+                `INSERT INTO user_roadmaps (user_id, target_role, roadmap_data, current_positioning, skill_gap) 
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [
+                    userId, 
+                    target_role, 
+                    JSON.stringify(initializedRoadmap),
+                    JSON.stringify(current_positioning),  // 👈 THÊM
+                    JSON.stringify(skill_gap)             // 👈 THÊM
+                ]
             );
+            console.log('✅ Roadmap created for user:', userId);
         }
 
         res.json({ success: true, message: 'Roadmap saved successfully' });
@@ -132,11 +153,18 @@ const saveRoadmap = async (req, res) => {
     }
 };
 
-// 2. Lấy Roadmap của User
+// 2. Lấy Roadmap của user
 const getMyRoadmap = async (req, res) => {
     try {
         const userId = req.user.id;
-        const result = await db.query('SELECT * FROM user_roadmaps WHERE user_id = $1', [userId]);
+        
+        // 👇 THÊM current_positioning và skill_gap vào SELECT
+        const result = await db.query(
+            `SELECT target_role, roadmap_data, current_positioning, skill_gap 
+             FROM user_roadmaps 
+             WHERE user_id = $1`, 
+            [userId]
+        );
 
         if (result.rows.length === 0) {
             return res.json({ roadmap: null });
@@ -144,7 +172,9 @@ const getMyRoadmap = async (req, res) => {
 
         res.json({ 
             target_role: result.rows[0].target_role,
-            roadmap: result.rows[0].roadmap_data 
+            roadmap: result.rows[0].roadmap_data,
+            current_positioning: result.rows[0].current_positioning,  // 👈 THÊM
+            skill_gap: result.rows[0].skill_gap                       // 👈 THÊM
         });
     } catch (error) {
         console.error('Error fetching roadmap:', error);

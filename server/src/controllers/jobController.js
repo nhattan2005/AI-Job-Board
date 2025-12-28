@@ -5,35 +5,50 @@ const { embedJobDescription, saveJobEmbedding } = require('../services/embedding
 
 // Create a new job (Employer only)
 const createJob = async (req, res) => {
-    // 👇 THÊM deadline vào destructuring
     const { title, description, location, salary_range, employment_type, deadline } = req.body;
-    const employer_id = req.user.id; // From auth middleware
-    
+    const employer_id = req.user.id;
+
     try {
-        // Validate required fields
-        if (!title || !description) {
-            return res.status(400).json({ error: 'Title and description are required' });
+        const result = await db.query(
+            `INSERT INTO jobs (title, description, location, salary_range, employment_type, employer_id, status, deadline)
+             VALUES ($1, $2, $3, $4, $5, $6, 'active', $7)
+             RETURNING id, created_at`,
+            [title, description, location, salary_range, employment_type, employer_id, deadline || null]
+        );
+
+        const jobId = result.rows[0].id;
+        console.log('✅ Job created, ID:', jobId);
+
+        // 👇 THÊM: Gửi notification cho tất cả followers
+        const { createNotification } = require('./notificationController');
+        
+        // Lấy company_name
+        const employerResult = await db.query('SELECT company_name FROM users WHERE id = $1', [employer_id]);
+        const companyName = employerResult.rows[0]?.company_name || 'A company';
+
+        // Lấy danh sách followers
+        const followersResult = await db.query(
+            'SELECT candidate_id FROM employer_followers WHERE employer_id = $1',
+            [employer_id]
+        );
+
+        // Gửi notification cho từng follower
+        for (const follower of followersResult.rows) {
+            await createNotification(
+                follower.candidate_id,
+                'new_job',
+                '💼 New Job Posted',
+                `${companyName} has posted a new job: ${title}`,
+                `/jobs/${jobId}`
+            );
         }
 
-        // 👇 CẬP NHẬT QUERY INSERT
-        const result = await db.query(
-            `INSERT INTO jobs (employer_id, title, description, location, salary_range, employment_type, deadline, status) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'active') 
-             RETURNING *`, 
-            [employer_id, title, description, location || '', salary_range || '', employment_type || 'full-time', deadline || null]
-        );
-        
-        const job = result.rows[0];
-        
-        // Generate and save embedding for the job
-        try {
-            const embedding = await embedJobDescription(description);
-            await saveJobEmbedding(job.id, embedding);
-        } catch (embeddingError) {
-            console.warn('Failed to generate embedding for job:', embeddingError);
-        }
-        
-        res.status(201).json(job);
+        console.log(`✅ Sent notifications to ${followersResult.rows.length} followers`);
+
+        res.status(201).json({
+            message: 'Job created successfully',
+            job: result.rows[0]
+        });
     } catch (error) {
         console.error('Error creating job:', error);
         res.status(500).json({ error: 'Failed to create job' });
@@ -162,32 +177,78 @@ const getMyJobs = async (req, res) => {
 const getJobApplications = async (req, res) => {
     const { id } = req.params;
     const employer_id = req.user.id;
-    
+
+    // 👇 THÊM: Lấy query params cho filter
+    const { 
+        status,          // pending, reviewed, accepted, rejected
+        minScore,        // Minimum match_score
+        skills,          // Comma-separated skills (e.g. "React,Node.js")
+        sortBy           // applied_at, match_score
+    } = req.query;
+
     try {
         // Verify job belongs to this employer
         const jobCheck = await db.query(
             'SELECT id FROM jobs WHERE id = $1 AND employer_id = $2',
             [id, employer_id]
         );
-        
+
         if (jobCheck.rows.length === 0) {
             return res.status(404).json({ error: 'Job not found or access denied' });
         }
-        
-        // Get applications with candidate details
-        const result = await db.query(`
+
+        // 👇 BUILD DYNAMIC QUERY
+        let query = `
             SELECT 
                 a.id, a.status, a.applied_at, a.match_score, a.ai_advice, a.cover_letter,
                 u.id as candidate_id, u.email as candidate_email, 
                 u.full_name as candidate_name, u.skills as candidate_skills,
-                c.cv_text, c.filename as cv_filename, c.file_path -- 👈 ĐẢM BẢO CÓ filename
+                c.cv_text, c.filename as cv_filename, c.file_path
             FROM applications a
             JOIN users u ON a.candidate_id = u.id
             LEFT JOIN cvs c ON a.cv_id = c.id
             WHERE a.job_id = $1
-            ORDER BY a.applied_at DESC
-        `, [id]);
-        
+        `;
+
+        const queryParams = [id];
+        let paramIndex = 2;
+
+        // Filter by status
+        if (status) {
+            query += ` AND a.status = $${paramIndex}`;
+            queryParams.push(status);
+            paramIndex++;
+        }
+
+        // Filter by minimum match score
+        if (minScore) {
+            query += ` AND a.match_score >= $${paramIndex}`;
+            queryParams.push(parseFloat(minScore));
+            paramIndex++;
+        }
+
+        // Filter by skills (check if candidate has ANY of the specified skills)
+        if (skills) {
+            const skillsArray = skills.split(',').map(s => s.trim().toLowerCase());
+            query += ` AND (`;
+            skillsArray.forEach((skill, idx) => {
+                if (idx > 0) query += ` OR `;
+                query += `LOWER(u.skills) LIKE $${paramIndex}`;
+                queryParams.push(`%${skill}%`);
+                paramIndex++;
+            });
+            query += `)`;
+        }
+
+        // Sorting
+        if (sortBy === 'match_score') {
+            query += ` ORDER BY a.match_score DESC NULLS LAST, a.applied_at DESC`;
+        } else {
+            query += ` ORDER BY a.applied_at DESC`;
+        }
+
+        const result = await db.query(query, queryParams);
+
         res.json({ applications: result.rows });
     } catch (error) {
         console.error('Error fetching job applications:', error);

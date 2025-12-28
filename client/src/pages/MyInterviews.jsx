@@ -17,11 +17,12 @@ const MyInterviews = () => {
     const fetchInterviews = async () => {
         try {
             setLoading(true);
+            // 👇 SỬA: Endpoint đúng theo backend routes
             const endpoint = isCandidate 
-                ? '/interviews/candidate/list'  // ← ĐÚNG
-                : '/interviews/employer/list';  // ← ĐÚNG
+                ? '/interviews/candidate'  // ✅ ĐÚNG (theo server/src/routes/interviewRoutes.js dòng 17)
+                : '/interviews/employer';  // ✅ ĐÚNG (theo server/src/routes/interviewRoutes.js dòng 14)
             
-            const response = await api.get(endpoint); // ← ĐÚNG
+            const response = await api.get(endpoint);
             setInterviews(response.data.interviews);
         } catch (err) {
             console.error('Error fetching interviews:', err);
