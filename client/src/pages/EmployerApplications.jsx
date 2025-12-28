@@ -12,17 +12,13 @@ const EmployerApplications = () => {
     const [error, setError] = useState(null);
     const [filters, setFilters] = useState({
         status: 'all',
-        minScore: '',
-        skills: '',
-        sortBy: 'applied_at'
+        keyword: ''
     });
+    const [searchKeyword, setSearchKeyword] = useState(''); // 👈 Thêm state tạm cho input
     
-    // UI States
     const [viewingCV, setViewingCV] = useState(null);
     const [expandedAppId, setExpandedAppId] = useState(null);
     const [selectedApplications, setSelectedApplications] = useState([]);
-    
-    // Modals
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
     const [selectedApplicationForInterview, setSelectedApplicationForInterview] = useState(null);
@@ -38,10 +34,7 @@ const EmployerApplications = () => {
                 api.get(`/jobs/${jobId}`),
                 api.get(`/jobs/${jobId}/applications`, {
                     params: {
-                        status: filters.status === 'all' ? undefined : filters.status,
-                        minScore: filters.minScore || undefined,
-                        skills: filters.skills || undefined,
-                        sortBy: filters.sortBy
+                        status: filters.status === 'all' ? undefined : filters.status
                     }
                 })
             ]);
@@ -55,19 +48,17 @@ const EmployerApplications = () => {
         }
     };
 
-    // Re-fetch khi filters change
     useEffect(() => {
         if (jobId) {
             fetchJobAndApplications();
         }
-    }, [jobId, filters]); // 👈 THÊM filters vào dependency
+    }, [jobId, filters]);
 
     const updateApplicationStatus = async (applicationId, newStatus) => {
         try {
-            await api.patch(`/applications/${applicationId}/status`, { // ← ĐÚNG
+            await api.patch(`/applications/${applicationId}/status`, {
                 status: newStatus
             });
-            // Optimistic update
             setApplications(apps => apps.map(app => 
                 app.id === applicationId ? { ...app, status: newStatus } : app
             ));
@@ -84,30 +75,18 @@ const EmployerApplications = () => {
 
     const downloadCV = async (app) => {
         try {
-            // 👇 SỬA: Dùng api service để gửi kèm token
             const response = await api.get(`/applications/${app.id}/download-cv`, {
-                responseType: 'blob' // Quan trọng: Nhận file dưới dạng blob
+                responseType: 'blob'
             });
-
-            // Tạo URL từ blob
             const url = window.URL.createObjectURL(new Blob([response.data]));
-            
-            // Lấy extension từ filename
-            const extension = app.cv_filename 
-                ? app.cv_filename.split('.').pop().toLowerCase() 
-                : 'pdf';
-            
-            // Tạo link download
+            const extension = app.cv_filename ? app.cv_filename.split('.').pop().toLowerCase() : 'pdf';
             const link = document.createElement('a');
             link.href = url;
             link.download = `${app.candidate_name}_CV.${extension}`;
             document.body.appendChild(link);
             link.click();
-            
-            // Cleanup
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
-            
         } catch (error) {
             console.error('Download error:', error);
             alert('Failed to download CV. Please try again.');
@@ -116,28 +95,26 @@ const EmployerApplications = () => {
 
     const handleDownloadCV = async (applicationId) => {
         try {
-            console.log(`📥 Downloading CV for application ${applicationId}`);
-            
-            const response = await api.get(`/applications/${applicationId}/download-cv`);
-            
-            const { url, filename } = response.data;
-            
-            console.log(`✅ CV URL received: ${url}`);
-            
-            // 👇 MỞ URL TRONG TAB MỚI (sẽ tự động download nhờ fl_attachment)
-            window.open(url, '_blank');
-            
+            const response = await api.get(`/applications/${applicationId}/download-cv`, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `CV_${applicationId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
         } catch (error) {
-            console.error('❌ Download CV error:', error);
-            alert('Failed to download CV. Please try again.');
+            console.error('Download CV error:', error);
+            alert('Failed to download CV');
         }
     };
 
-    const toggleExpand = (id) => {
-        setExpandedAppId(expandedAppId === id ? null : id);
+    const toggleExpand = (appId) => {
+        setExpandedAppId(prev => prev === appId ? null : appId);
     };
-
-    // --- HELPER FUNCTIONS FOR UI ---
 
     const getStatusBadge = (status) => {
         const styles = {
@@ -156,12 +133,20 @@ const EmployerApplications = () => {
         );
     };
 
-    // --- FILTER LOGIC ---
-    const filteredApplications = applications.filter(app => 
-        filters.status === 'all' ? true : app.status === filters.status
-    );
+    // ✅ CLIENT-SIDE FILTERING - BẮT BUỘC PHẢI CÓ
+    const filteredApplications = applications.filter(app => {
+        const matchesStatus = filters.status === 'all' || app.status === filters.status;
+        
+        let matchesKeyword = true;
+        if (filters.keyword.trim()) {
+            const keywords = filters.keyword.toLowerCase().split(',').map(k => k.trim()).filter(k => k);
+            const cvText = (app.cv_text || '').toLowerCase();
+            matchesKeyword = keywords.some(keyword => cvText.includes(keyword));
+        }
+        
+        return matchesStatus && matchesKeyword;
+    });
 
-    // --- SELECTION LOGIC ---
     const toggleSelect = (appId) => {
         setSelectedApplications(prev => {
             if (prev.includes(appId)) return prev.filter(id => id !== appId);
@@ -171,12 +156,24 @@ const EmployerApplications = () => {
 
     const clearSelection = () => setSelectedApplications([]);
 
+    // 👇 Hàm xử lý khi nhấn Enter
+    const handleKeywordSearch = (e) => {
+        if (e.key === 'Enter') {
+            setFilters({ ...filters, keyword: searchKeyword });
+        }
+    };
+
+    // 👇 Hàm reset search
+    const handleClearSearch = () => {
+        setSearchKeyword('');
+        setFilters({ ...filters, keyword: '' });
+    };
+
     if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
     if (error) return <div className="text-center py-20 text-red-600">{error}</div>;
 
     return (
         <div className="max-w-6xl mx-auto pb-20">
-            {/* Header Section */}
             <div className="mb-8">
                 <Link to="/employer/dashboard" className="text-slate-500 hover:text-blue-600 font-medium flex items-center mb-4 transition">
                     <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
@@ -188,7 +185,6 @@ const EmployerApplications = () => {
                         <p className="text-slate-500">{applications.length} Total Applications</p>
                     </div>
                     <div className="flex gap-3">
-                        {/* Stats Cards Mini */}
                         <div className="px-4 py-2 bg-white rounded-lg border border-slate-200 shadow-sm text-center">
                             <span className="block text-xl font-bold text-slate-800">{applications.filter(a => a.status === 'pending').length}</span>
                             <span className="text-xs text-slate-500 uppercase font-bold">Pending</span>
@@ -201,12 +197,10 @@ const EmployerApplications = () => {
                 </div>
             </div>
 
-            {/* Filter Section */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">🔍 Filter Candidates</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {/* Status Filter */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                         <select
@@ -219,64 +213,76 @@ const EmployerApplications = () => {
                             <option value="reviewed">Reviewed</option>
                             <option value="accepted">Accepted</option>
                             <option value="rejected">Rejected</option>
+                            <option value="interview_scheduled">Interview Scheduled</option>
                         </select>
                     </div>
 
-                    {/* Min Score Filter */}
                     <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Min Match Score</label>
-                        <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={filters.minScore}
-                            onChange={(e) => setFilters({ ...filters, minScore: e.target.value })}
-                            placeholder="e.g. 70"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Keyword in CV</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchKeyword}
+                                onChange={(e) => setSearchKeyword(e.target.value)}
+                                onKeyDown={handleKeywordSearch}
+                                placeholder="Type keywords and press Enter..."
+                                className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            {searchKeyword && (
+                                <button
+                                    onClick={handleClearSearch}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                            <p className="text-xs text-gray-500">
+                                {filters.keyword ? (
+                                    <>
+                                        <span className="text-green-600 font-semibold">✓</span> Searching: "{filters.keyword}"
+                                    </>
+                                ) : (
+                                    "Press Enter to search"
+                                )}
+                            </p>
+                            {filters.keyword && (
+                                <button
+                                    onClick={handleClearSearch}
+                                    className="text-xs text-blue-600 hover:underline font-semibold"
+                                >
+                                    Clear search
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                            <span className="font-semibold">Tip:</span> Use comma for OR search (e.g. "React, Python")
+                        </p>
                     </div>
+                </div>
 
-                    {/* Skills Filter */}
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Required Skills</label>
-                        <input
-                            type="text"
-                            value={filters.skills}
-                            onChange={(e) => setFilters({ ...filters, skills: e.target.value })}
-                            placeholder="React, Node.js, Python"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Separate with commas</p>
-                    </div>
-
-                    {/* Sort By */}
-                    <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">Sort By</label>
-                        <select
-                            value={filters.sortBy}
-                            onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                {(filters.status !== 'all' || filters.keyword.trim()) && (
+                    <div className="mt-4">
+                        <button
+                            onClick={() => {
+                                setFilters({ status: 'all', keyword: '' });
+                                setSearchKeyword(''); // 👈 Reset input
+                            }}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition flex items-center gap-2"
                         >
-                            <option value="applied_at">Application Date</option>
-                            <option value="match_score">Match Score</option>
-                        </select>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Clear All Filters
+                        </button>
                     </div>
-                </div>
-
-                {/* Reset Button */}
-                <div className="mt-4">
-                    <button
-                        onClick={() => setFilters({ status: 'all', minScore: '', skills: '', sortBy: 'applied_at' })}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
-                    >
-                        Reset Filters
-                    </button>
-                </div>
+                )}
             </div>
 
-            {/* Toolbar: Filter & Bulk Actions */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-20 z-10">
-                {/* Filters */}
                 <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 no-scrollbar">
                     {['all', 'pending', 'reviewed', 'interview_scheduled', 'accepted', 'rejected'].map(status => (
                         <button
@@ -293,7 +299,6 @@ const EmployerApplications = () => {
                     ))}
                 </div>
 
-                {/* Bulk Actions */}
                 {selectedApplications.length > 0 && (
                     <div className="flex items-center gap-3 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 animate-fade-in">
                         <span className="text-sm font-bold text-blue-800">{selectedApplications.length} selected</span>
@@ -307,7 +312,6 @@ const EmployerApplications = () => {
                 )}
             </div>
 
-            {/* Applications List */}
             <div className="space-y-4">
                 {filteredApplications.length === 0 ? (
                     <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 border-dashed">
@@ -322,10 +326,8 @@ const EmployerApplications = () => {
 
                         return (
                             <div key={app.id} className={`bg-white rounded-xl border transition-all duration-200 ${isSelected ? 'border-blue-400 ring-1 ring-blue-100' : 'border-slate-200 hover:border-blue-300 hover:shadow-md'}`}>
-                                {/* Main Card Row */}
                                 <div className="p-5 flex flex-col md:flex-row gap-6 items-start md:items-center">
                                     
-                                    {/* Checkbox */}
                                     <div className="pt-1 md:pt-0">
                                         <input 
                                             type="checkbox" 
@@ -335,7 +337,6 @@ const EmployerApplications = () => {
                                         />
                                     </div>
 
-                                    {/* Candidate Info */}
                                     <div className="flex-grow min-w-0">
                                         <div className="flex items-center gap-3 mb-1">
                                             <h3 className="text-lg font-bold text-slate-900 truncate">{app.candidate_name}</h3>
@@ -353,10 +354,8 @@ const EmployerApplications = () => {
                                         </div>
                                     </div>
 
-                                    {/* Primary Actions - Context Aware */}
                                     <div className="flex items-center gap-2 min-w-[200px] justify-end">
                                         
-                                        {/* LOGIC MỚI: Pending -> Accept / Reject */}
                                         {app.status === 'pending' && (
                                             <>
                                                 <button 
@@ -378,7 +377,6 @@ const EmployerApplications = () => {
                                             </>
                                         )}
                                         
-                                        {/* LOGIC MỚI: Reviewed (Đã Accept) -> Interview */}
                                         {app.status === 'reviewed' && (
                                             <button 
                                                 onClick={() => openInterviewModal(app)}
@@ -411,7 +409,6 @@ const EmployerApplications = () => {
                                             </>
                                         )}
 
-                                        {/* Expand Toggle */}
                                         <button 
                                             onClick={() => toggleExpand(app.id)}
                                             className={`p-2 rounded-lg transition ${isExpanded ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:bg-slate-50'}`}
@@ -421,13 +418,10 @@ const EmployerApplications = () => {
                                     </div>
                                 </div>
 
-                                {/* Expanded Details Section */}
                                 {isExpanded && (
                                     <div className="border-t border-slate-100 bg-slate-50/50 p-6 animate-fade-in rounded-b-xl">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            {/* Left: AI Insights & Skills */}
                                             <div className="space-y-6">
-                                                {/* AI Advice */}
                                                 {app.ai_advice && app.ai_advice.length > 0 && (
                                                     <div className="bg-white p-4 rounded-xl border border-purple-100 shadow-sm">
                                                         <h4 className="font-bold text-purple-900 mb-3 flex items-center">
@@ -444,7 +438,6 @@ const EmployerApplications = () => {
                                                     </div>
                                                 )}
 
-                                                {/* Skills */}
                                                 <div>
                                                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Detected Skills</h4>
                                                     <div className="flex flex-wrap gap-2">
@@ -459,9 +452,7 @@ const EmployerApplications = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Right: Cover Letter & Secondary Actions */}
                                             <div className="space-y-6">
-                                                {/* Cover Letter */}
                                                 {app.cover_letter && (
                                                     <div>
                                                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cover Letter</h4>
@@ -471,13 +462,12 @@ const EmployerApplications = () => {
                                                     </div>
                                                 )}
 
-                                                {/* Secondary Actions Grid */}
                                                 <div className="grid grid-cols-2 gap-3 pt-2">
                                                     <button onClick={() => setViewingCV(app)} className="flex items-center justify-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
                                                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                                         View CV
                                                     </button>
-                                                    <button onClick={() => downloadCV(app)} className="flex items-center justify-center px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+                                                    <button onClick={() => downloadCV(app)} className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition">
                                                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                                         Download
                                                     </button>
@@ -492,7 +482,6 @@ const EmployerApplications = () => {
                 )}
             </div>
 
-            {/* Modals */}
             {viewingCV && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl">

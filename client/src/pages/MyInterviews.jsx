@@ -17,10 +17,9 @@ const MyInterviews = () => {
     const fetchInterviews = async () => {
         try {
             setLoading(true);
-            // 👇 SỬA: Endpoint đúng theo backend routes
             const endpoint = isCandidate 
-                ? '/interviews/candidate'  // ✅ ĐÚNG (theo server/src/routes/interviewRoutes.js dòng 17)
-                : '/interviews/employer';  // ✅ ĐÚNG (theo server/src/routes/interviewRoutes.js dòng 14)
+                ? '/interviews/candidate' 
+                : '/interviews/employer';
             
             const response = await api.get(endpoint);
             setInterviews(response.data.interviews);
@@ -36,21 +35,22 @@ const MyInterviews = () => {
         switch (status) {
             case 'pending':
                 return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'scheduled': // Added scheduled
             case 'confirmed':
                 return 'bg-green-100 text-green-800 border-green-200';
             case 'completed':
                 return 'bg-blue-100 text-blue-800 border-blue-200';
             case 'cancelled':
+            case 'rejected':
                 return 'bg-red-100 text-red-800 border-red-200';
             default:
                 return 'bg-gray-100 text-gray-800 border-gray-200';
         }
     };
 
-    // 👇 CẬP NHẬT HÀM NÀY
     const formatDate = (dateString, status) => {
         if (!dateString) {
-            return status === 'pending' ? 'Pending Confirmation' : 'Not scheduled';
+            return (status === 'pending' || status === 'interviewing') ? 'Pending Confirmation' : 'Not scheduled';
         }
         const date = new Date(dateString);
         return date.toLocaleString('en-US', {
@@ -71,7 +71,7 @@ const MyInterviews = () => {
     const filteredInterviews = interviews.filter(interview => {
         if (filter === 'all') return true;
         if (filter === 'past') return isPastInterview(interview.interview_date);
-        if (filter === 'upcoming') return !isPastInterview(interview.interview_date) && interview.status === 'confirmed';
+        if (filter === 'upcoming') return !isPastInterview(interview.interview_date) && (interview.status === 'confirmed' || interview.status === 'scheduled');
         return interview.status === filter;
     });
 
@@ -105,34 +105,26 @@ const MyInterviews = () => {
                         My Interviews
                     </h1>
                     <p className="text-gray-700">
-                        {filteredInterviews.length} interview{filteredInterviews.length !== 1 ? 's' : ''}
+                        {filteredInterviews.length} interview{filteredInterviews.length !== 1 ? 's' : ''} scheduled or pending
                     </p>
                 </div>
             </div>
 
-            {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-                    {error}
-                </div>
-            )}
-
-            {/* Filter Tabs */}
-            <div className="bg-white rounded-lg shadow p-4 mb-6">
-                <div className="flex flex-wrap gap-2">
-                    {['all', 'pending', 'confirmed', 'upcoming', 'past'].map(status => (
-                        <button
-                            key={status}
-                            onClick={() => setFilter(status)}
-                            className={`px-4 py-2 rounded-lg font-semibold transition ${
-                                filter === status
-                                    ? 'bg-purple-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </button>
-                    ))}
-                </div>
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2 mb-6">
+                {['all', 'upcoming', 'pending', 'past', 'cancelled'].map(f => (
+                    <button
+                        key={f}
+                        onClick={() => setFilter(f)}
+                        className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+                            filter === f
+                                ? 'bg-purple-600 text-white shadow-md'
+                                : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                        }`}
+                    >
+                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                    </button>
+                ))}
             </div>
 
             {/* Interviews List */}
@@ -182,7 +174,7 @@ const MyInterviews = () => {
                                     </div>
                                     <div className="flex flex-col items-end space-y-2">
                                         <span className={`px-3 py-1 rounded-full text-sm font-semibold border ${getStatusColor(interview.status)}`}>
-                                            {interview.status.charAt(0).toUpperCase() + interview.status.slice(1)}
+                                            {interview.status.charAt(0).toUpperCase() + interview.status.slice(1).replace('_', ' ')}
                                         </span>
                                         {isPast && (
                                             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">
@@ -199,7 +191,6 @@ const MyInterviews = () => {
                                         </svg>
                                         <div>
                                             <p className="text-xs text-gray-500">Date & Time</p>
-                                            {/* 👇 CẬP NHẬT CÁCH GỌI HÀM: Truyền thêm interview.status */}
                                             <p className={`font-semibold ${!interview.interview_date ? 'text-amber-600' : ''}`}>
                                                 {formatDate(interview.interview_date, interview.status)}
                                             </p>
@@ -222,25 +213,30 @@ const MyInterviews = () => {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
                                         <div>
-                                            <p className="text-xs text-gray-500">Location</p>
-                                            <p className="font-semibold">{interview.location}</p>
+                                            <p className="text-xs text-gray-500">Method / Location</p>
+                                            <p className="font-semibold">
+                                                {interview.location === 'Online' ? '🌐 Online Meeting' : 
+                                                 interview.location === 'Phone' ? '📞 Phone Call' : 
+                                                 interview.location ? `🏢 ${interview.location}` : 'Not specified'}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
 
-                                {isCandidate && interview.meeting_link && (
+                                {/* Meeting Link - Show for BOTH Candidate and Employer */}
+                                {interview.meeting_link && (
                                     <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                                         <div className="flex items-center">
                                             <svg className="h-5 w-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                                             </svg>
-                                            <div>
+                                            <div className="overflow-hidden">
                                                 <p className="text-sm text-gray-600">Meeting Link:</p>
                                                 <a 
                                                     href={interview.meeting_link} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
-                                                    className="text-blue-600 hover:text-blue-800 font-semibold hover:underline break-all"
+                                                    className="text-blue-600 hover:text-blue-800 font-semibold hover:underline break-all block"
                                                 >
                                                     {interview.meeting_link}
                                                 </a>
@@ -249,7 +245,7 @@ const MyInterviews = () => {
                                     </div>
                                 )}
 
-                                {isCandidate && interview.notes && (
+                                {interview.notes && (
                                     <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
                                         <p className="text-sm text-gray-600 mb-1">Additional Notes:</p>
                                         <p className="text-gray-800 whitespace-pre-wrap">{interview.notes}</p>
@@ -257,7 +253,7 @@ const MyInterviews = () => {
                                 )}
 
                                 <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                                    {isCandidate && interview.status === 'pending' && (
+                                    {isCandidate && (interview.status === 'pending' || interview.status === 'interviewing') && (
                                         <Link
                                             to={`/interview/schedule/${interview.application_id}`}
                                             className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold flex items-center"
@@ -271,7 +267,7 @@ const MyInterviews = () => {
                                     
                                     {isEmployer && (
                                         <Link
-                                            to={`/employer/jobs/${interview.application_id}/applications`}
+                                            to={`/employer/jobs/${interview.job_id}/applications`}
                                             className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
                                         >
                                             View Application

@@ -26,13 +26,23 @@ const InterviewSchedulePage = () => {
     const fetchInterviewDetails = async () => {
         try {
             setLoading(true);
-            // 👇 SỬA: Đổi /interviews thành /interview
-            const response = await api.get(`/interview/application/${applicationId}`);
-            setInterview(response.data.interview);
+            // 👇 SỬA: Đổi '/interview' thành '/interviews' (số nhiều)
+            const response = await api.get(`/interviews/application/${applicationId}`);
             
-            const confirmedSlot = response.data.interview.timeSlots.find(s => s.is_selected);
-            if (confirmedSlot) {
-                setSelectedSlotId(confirmedSlot.id);
+            // Backend trả về object trực tiếp (dựa trên controller getInterviewByApplication)
+            // hoặc trả về { interview: ... } tùy vào implementation. 
+            // Dựa vào code cũ của bạn là response.data.interview, nhưng controller trả về res.json(result.rows[0])
+            // Nên ta cần kiểm tra kỹ. Nếu controller trả về row[0] thì data chính là interview.
+            const interviewData = response.data.interview || response.data; 
+            
+            setInterview(interviewData);
+            
+            // Kiểm tra xem đã có slot nào được chọn chưa (nếu interviewData.time_slots tồn tại)
+            if (interviewData.time_slots) {
+                const confirmedSlot = interviewData.time_slots.find(s => s.is_selected);
+                if (confirmedSlot) {
+                    setSelectedSlotId(confirmedSlot.id);
+                }
             }
         } catch (err) {
             console.error('Error fetching interview:', err);
@@ -52,14 +62,16 @@ const InterviewSchedulePage = () => {
         setError(null);
 
         try {
-            // 👇 SỬA: Đổi /interviews thành /interview
-            await api.post('/interview/confirm', {
-                interviewId: interview.id,
+            // 👇 SỬA: 
+            // 1. Đổi '/interview' thành '/interviews'
+            // 2. Route đúng là POST /interviews/:applicationId/confirm
+            await api.post(`/interviews/${applicationId}/confirm`, {
                 slotId: selectedSlotId
             });
 
             setSuccess(true);
             
+            // Redirect sau 2 giây
             setTimeout(() => {
                 navigate('/my-interviews');
             }, 2000);
@@ -82,7 +94,7 @@ const InterviewSchedulePage = () => {
 
     if (error && !interview) {
         return (
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto mt-10 px-4">
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
                     {error}
                 </div>
@@ -93,10 +105,10 @@ const InterviewSchedulePage = () => {
         );
     }
 
-    const isAlreadyConfirmed = interview?.status === 'confirmed';
+    const isAlreadyConfirmed = interview?.status === 'scheduled' || interview?.status === 'confirmed';
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl mx-auto px-4 py-8">
             {/* Header */}
             <div className="mb-8">
                 <Link to="/my-applications" className="text-blue-600 hover:text-blue-800 font-semibold flex items-center mb-4">
@@ -214,9 +226,9 @@ const InterviewSchedulePage = () => {
                     {isAlreadyConfirmed ? 'Your Confirmed Time' : 'Select Your Preferred Time'}
                 </h2>
                 
-                {interview?.timeSlots && interview.timeSlots.length > 0 ? (
+                {interview?.time_slots && interview.time_slots.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {interview.timeSlots.map((slot) => {
+                        {interview.time_slots.map((slot) => {
                             const slotDate = new Date(slot.slot_date);
                             const isSelected = selectedSlotId === slot.id;
                             const isConfirmedSlot = slot.is_selected;
