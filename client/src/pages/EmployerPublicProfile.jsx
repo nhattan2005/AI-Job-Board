@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext'; // 👈 THÊM
+import ReportModal from '../components/ReportModal'; // 👈 Import
 
 const EmployerPublicProfile = () => {
     const { employerId } = useParams();
@@ -12,7 +13,8 @@ const EmployerPublicProfile = () => {
     const [isFollowing, setIsFollowing] = useState(false);
     const [followerCount, setFollowerCount] = useState(0);
     const [followLoading, setFollowLoading] = useState(false);
-    const { isAuthenticated, isCandidate } = useAuth(); // 👈 THÊM
+    const { isAuthenticated, isCandidate } = useAuth();
+    const [showReportModal, setShowReportModal] = useState(false); // 👈 State
 
     useEffect(() => {
         fetchEmployerProfile();
@@ -113,7 +115,16 @@ const EmployerPublicProfile = () => {
     }
 
     return (
-        <div className="max-w-6xl mx-auto py-8 px-4">
+        <div className="min-h-screen bg-slate-50 pb-12">
+            {/* Add Report Modal */}
+            <ReportModal 
+                isOpen={showReportModal}
+                onClose={() => setShowReportModal(false)}
+                targetType="user"
+                targetId={employer?.id}
+                targetName={employer?.company_name}
+            />
+
             {/* Back Button */}
             <Link
                 to="/"
@@ -189,7 +200,7 @@ const EmployerPublicProfile = () => {
                                     <>
                                         <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
+                                        </svg> {/* 👈 THÊM THẺ ĐÓNG NÀY */}
                                         Following
                                     </>
                                 ) : (

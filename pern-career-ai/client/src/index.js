@@ -19,9 +19,7 @@ const authRoutes = require('./routes/authRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const applicationRoutes = require('./src/routes/applicationRoutes');
 const cvRoutes = require('./src/routes/cvRoutes');
-const employerEmailRoutes = require('./src/routes/employerEmailRoutes'); // 👇 Đảm bảo đã import route này
-const adminRoutes = require('./routes/adminRoutes');
-const bannerRoutes = require('./routes/bannerRoutes');
+const employerEmailRoutes = require('./src/routes/employerEmailRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);

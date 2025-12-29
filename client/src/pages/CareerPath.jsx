@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios'; // Hoặc import api from '../services/api' nếu bạn đã cấu hình
-import api from '../services/api'; // Sử dụng instance api đã cấu hình token
-import { Link, useNavigate } from 'react-router-dom'; // Thêm useNavigate
+import api from '../services/api';
+import { Link, useNavigate } from 'react-router-dom';
 
 const CareerPath = () => {
     const [cvText, setCvText] = useState('');
@@ -10,8 +9,8 @@ const CareerPath = () => {
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
     const [useFileUpload, setUseFileUpload] = useState(false);
-    const navigate = useNavigate(); // Hook điều hướng
-    const [saving, setSaving] = useState(false); // State loading khi save
+    const navigate = useNavigate();
+    const [saving, setSaving] = useState(false);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -34,20 +33,14 @@ const CareerPath = () => {
             let response;
 
             if (useFileUpload && cvFile) {
-                // Upload file
                 const formData = new FormData();
                 formData.append('cv', cvFile);
 
                 response = await api.post('/career/generate', formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data'
-                    }
+                    headers: { 'Content-Type': 'multipart/form-data' }
                 });
             } else if (!useFileUpload && cvText.trim()) {
-                // Send text
-                response = await api.post('/career/generate', {
-                    cvText: cvText
-                });
+                response = await api.post('/career/generate', { cvText: cvText });
             } else {
                 setError('Please provide CV text or upload a file');
                 setLoading(false);
@@ -65,10 +58,10 @@ const CareerPath = () => {
 
     const getPriorityColor = (priority) => {
         switch (priority?.toLowerCase()) {
-            case 'high': return 'bg-red-100 text-red-800';
-            case 'medium': return 'bg-yellow-100 text-yellow-800';
-            case 'low': return 'bg-green-100 text-green-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'high': return 'bg-red-100 text-red-800 border-red-200';
+            case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'low': return 'bg-green-100 text-green-800 border-green-200';
+            default: return 'bg-slate-100 text-slate-800 border-slate-200';
         }
     };
 
@@ -78,7 +71,6 @@ const CareerPath = () => {
         return 'text-orange-600';
     };
 
-    // --- HÀM MỚI: APPLY ROADMAP ---
     const handleApplyRoadmap = async () => {
         if (!result) return;
         setSaving(true);
@@ -86,10 +78,9 @@ const CareerPath = () => {
             await api.post('/career/save', {
                 target_role: result.current_positioning.role,
                 roadmap: result.roadmap,
-                current_positioning: result.current_positioning,  // 👈 THÊM
-                skill_gap: result.skill_gap                       // 👈 THÊM
+                current_positioning: result.current_positioning,
+                skill_gap: result.skill_gap
             });
-            // Chuyển hướng sang trang My Roadmap
             navigate('/my-roadmap');
         } catch (error) {
             console.error("Failed to save roadmap", error);
@@ -100,306 +91,334 @@ const CareerPath = () => {
     };
 
     return (
-        <div className="max-w-6xl mx-auto">
-            {/* Header */}
-            <div className="mb-8">
-                <Link to="/" className="text-blue-600 hover:text-blue-800 font-semibold mb-4 inline-block">
-                    ← Back to Home
-                </Link>
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">🚀 AI Career Path Analyzer</h1>
-                <p className="text-gray-600">
-                    Upload your CV and get personalized career recommendations, skill gap analysis, and a roadmap to your dream job
-                </p>
-            </div>
-
-            {/* Input Section */}
-            <div className="bg-white rounded-lg shadow-md p-8 mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 1: Provide Your CV</h2>
-
-                {/* Toggle between text and file */}
-                <div className="flex items-center space-x-4 mb-6">
-                    <button
-                        onClick={() => setUseFileUpload(false)}
-                        className={`px-4 py-2 rounded-lg font-semibold transition ${
-                            !useFileUpload
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                    >
-                        📝 Paste Text
-                    </button>
-                    <button
-                        onClick={() => setUseFileUpload(true)}
-                        className={`px-4 py-2 rounded-lg font-semibold transition ${
-                            useFileUpload
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                        }`}
-                    >
-                        📄 Upload File
-                    </button>
+        <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-6xl mx-auto">
+                {/* Header */}
+                <div className="text-center mb-12">
+                    <h1 className="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">
+                        AI Career Path Analyzer
+                    </h1>
+                    <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+                        Upload your CV to get personalized career recommendations, skill gap analysis, and a roadmap to your dream job.
+                    </p>
                 </div>
 
-                {/* Text Input */}
-                {!useFileUpload && (
-                    <div className="mb-6">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Paste your CV text here:
-                        </label>
-                        <textarea
-                            value={cvText}
-                            onChange={(e) => setCvText(e.target.value)}
-                            rows="10"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Paste your CV content here... (Education, Experience, Skills, Projects, etc.)"
-                        />
-                        <p className="text-sm text-gray-500 mt-2">
-                            {cvText.length} characters
-                        </p>
-                    </div>
-                )}
-
-                {/* File Upload */}
-                {useFileUpload && (
-                    <div className="mb-6">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            Upload your CV (PDF, DOCX, TXT):
-                        </label>
-                        <input
-                            type="file"
-                            accept=".pdf,.docx,.txt"
-                            onChange={handleFileChange}
-                            className="block w-full text-sm text-gray-500
-                                file:mr-4 file:py-3 file:px-6
-                                file:rounded-lg file:border-0
-                                file:text-sm file:font-semibold
-                                file:bg-blue-50 file:text-blue-700
-                                hover:file:bg-blue-100
-                                cursor-pointer"
-                        />
-                        {cvFile && (
-                            <p className="mt-2 text-sm text-green-600 flex items-center">
-                                <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                </svg>
-                                {cvFile.name}
-                            </p>
-                        )}
-                    </div>
-                )}
-
-                {/* Error Message */}
-                {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-                        {error}
-                    </div>
-                )}
-
-                {/* Analyze Button */}
-                <button
-                    onClick={handleAnalyze}
-                    disabled={loading || (!useFileUpload && !cvText.trim()) || (useFileUpload && !cvFile)}
-                    className={`w-full py-4 rounded-lg font-bold text-lg transition shadow-lg ${
-                        loading
-                            ? 'bg-gray-400 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
-                    }`}
-                >
-                    {loading ? (
-                        <span className="flex items-center justify-center">
-                            <svg className="animate-spin h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Analyzing Your Career Path...
-                        </span>
-                    ) : (
-                        '🚀 Analyze My Career Path'
-                    )}
-                </button>
-            </div>
-
-            {/* Results Section */}
-            {result && (
-                <div className="space-y-6">
-                    {/* Current Positioning */}
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-                            <span className="bg-blue-100 text-blue-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
-                                📍
-                            </span>
-                            Current Positioning
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                            <div className="bg-blue-50 p-4 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-1">Role</p>
-                                <p className="text-lg font-bold text-gray-900">{result.current_positioning.role}</p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+                    {/* Left Column: Input Form */}
+                    <div className="lg:col-span-2">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                            {/* Toggle Buttons */}
+                            <div className="flex p-1 bg-slate-100 rounded-xl mb-8">
+                                <button
+                                    onClick={() => setUseFileUpload(false)}
+                                    className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${!useFileUpload ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    📝 Paste Text
+                                </button>
+                                <button
+                                    onClick={() => setUseFileUpload(true)}
+                                    className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${useFileUpload ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    📄 Upload File
+                                </button>
                             </div>
-                            <div className="bg-green-50 p-4 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-1">Level</p>
-                                <p className="text-lg font-bold text-gray-900">{result.current_positioning.level}</p>
-                            </div>
-                            <div className="bg-purple-50 p-4 rounded-lg">
-                                <p className="text-sm text-gray-600 mb-1">Salary Potential</p>
-                                <p className="text-lg font-bold text-gray-900">{result.current_positioning.salary_potential}</p>
-                            </div>
-                        </div>
-                        <p className="text-gray-700">{result.current_positioning.summary}</p>
-                    </div>
 
-                    {/* Skill Gap */}
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-                            <span className="bg-orange-100 text-orange-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
-                                📊
-                            </span>
-                            Skill Gap Analysis
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {result.skill_gap.map((skill, index) => (
-                                <div key={index} className="border-l-4 border-orange-500 bg-orange-50 p-4 rounded-r-lg">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="font-bold text-gray-900">{skill.skill}</h4>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(skill.priority)}`}>
-                                            {skill.priority} Priority
-                                        </span>
-                                    </div>
-                                    <p className="text-sm text-gray-600">
-                                        Status: <span className="font-semibold text-orange-700">{skill.status}</span>
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Career Paths */}
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-                            <span className="bg-green-100 text-green-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
-                                🎯
-                            </span>
-                            Recommended Career Paths
-                        </h3>
-                        <div className="space-y-4">
-                            {result.paths.map((path, index) => (
-                                <div key={index} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition">
-                                    <div className="flex items-start justify-between mb-3">
-                                        <h4 className="text-xl font-bold text-gray-900">{path.name}</h4>
-                                        <div className="text-right">
-                                            <div className={`text-3xl font-bold ${getMatchColor(path.match)}`}>
-                                                {path.match}%
-                                            </div>
-                                            <p className="text-sm text-gray-500">Match</p>
+                            {/* Input Area */}
+                            <div className="mb-8">
+                                {!useFileUpload ? (
+                                    <div className="relative">
+                                        <textarea
+                                            value={cvText}
+                                            onChange={(e) => setCvText(e.target.value)}
+                                            rows="8"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition resize-none bg-slate-50 focus:bg-white"
+                                            placeholder="Paste your CV content here... (Education, Experience, Skills, Projects, etc.)"
+                                        />
+                                        <div className="absolute bottom-3 right-3 text-xs text-slate-400 font-medium bg-white/80 px-2 py-1 rounded">
+                                            {cvText.length} chars
                                         </div>
                                     </div>
-                                    <p className="text-sm text-gray-600 mb-4">
-                                        ⏱️ Timeline: <span className="font-semibold">{path.time}</span>
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="bg-green-50 p-4 rounded-lg">
-                                            <h5 className="font-semibold text-green-800 mb-2">✅ Pros:</h5>
-                                            <ul className="space-y-1">
-                                                {path.pros.map((pro, i) => (
-                                                    <li key={i} className="text-sm text-gray-700">• {pro}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                        <div className="bg-red-50 p-4 rounded-lg">
-                                            <h5 className="font-semibold text-red-800 mb-2">⚠️ Cons:</h5>
-                                            <ul className="space-y-1">
-                                                {path.cons.map((con, i) => (
-                                                    <li key={i} className="text-sm text-gray-700">• {con}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Roadmap */}
-                    <div className="bg-white rounded-lg shadow-md p-6">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                            <span className="bg-purple-100 text-purple-600 rounded-full w-10 h-10 flex items-center justify-center mr-3">
-                                🗺️
-                            </span>
-                            Your Career Roadmap
-                        </h3>
-                        <div className="relative">
-                            {/* Timeline line */}
-                            <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 to-purple-500"></div>
-                            
-                            {result.roadmap.map((phase, index) => (
-                                <div key={index} className="relative pl-20 pb-8 last:pb-0">
-                                    {/* Timeline dot */}
-                                    <div className="absolute left-5 top-0 w-6 h-6 rounded-full bg-blue-500 border-4 border-white shadow-lg"></div>
-                                    
-                                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg border-l-4 border-blue-500">
-                                        <h4 className="text-xl font-bold text-gray-900 mb-4">
-                                            📅 {phase.phase}
-                                        </h4>
-                                        <div className="space-y-3">
-                                            {phase.actions.map((action, i) => (
-                                                <div key={i} className="flex items-start bg-white p-3 rounded-lg shadow-sm">
-                                                    <span className="inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded mr-3 mt-0.5">
-                                                        {action.type}
-                                                    </span>
-                                                    <p className="text-gray-700 flex-1">{action.content}</p>
+                                ) : (
+                                    <div className={`border-2 border-dashed rounded-xl p-10 text-center transition-all ${cvFile ? 'border-green-400 bg-green-50' : 'border-slate-300 hover:border-blue-500 hover:bg-slate-50'}`}>
+                                        <input
+                                            type="file"
+                                            id="cv-upload"
+                                            accept=".pdf,.docx,.txt"
+                                            onChange={handleFileChange}
+                                            className="hidden"
+                                        />
+                                        <label htmlFor="cv-upload" className="cursor-pointer w-full h-full block">
+                                            {cvFile ? (
+                                                <div className="flex flex-col items-center text-green-700">
+                                                    <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    <span className="font-bold text-lg">{cvFile.name}</span>
+                                                    <span className="text-sm mt-1">Click to change file</span>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-slate-500">
+                                                    <svg className="w-12 h-12 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                    </svg>
+                                                    <span className="font-semibold text-lg text-slate-700">Click to upload CV</span>
+                                                    <span className="text-sm mt-1">PDF, DOCX or TXT (Max 5MB)</span>
+                                                </div>
+                                            )}
+                                        </label>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                                )}
+                            </div>
 
-                    {/* Action Buttons - CẬP NHẬT PHẦN NÀY */}
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-lg p-8 text-center text-white">
-                        <h3 className="text-2xl font-bold mb-4">Ready to Start Your Journey?</h3>
-                        <p className="mb-6 text-blue-100">
-                            Apply this roadmap to your personal dashboard and track your daily progress!
-                        </p>
-                        <div className="flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
-                            <Link
-                                to="/"
-                                className="inline-block bg-white/10 backdrop-blur-sm border border-white/30 text-white px-8 py-3 rounded-lg font-bold hover:bg-white/20 transition"
-                            >
-                                Browse Jobs
-                            </Link>
-                            
-                            {/* Nút Apply Roadmap Mới */}
+                            {/* Error Message */}
+                            {error && (
+                                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-center">
+                                    <svg className="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {error}
+                                </div>
+                            )}
+
+                            {/* Analyze Button */}
                             <button
-                                onClick={handleApplyRoadmap}
-                                disabled={saving}
-                                className="inline-flex items-center bg-white text-blue-600 px-8 py-3 rounded-lg font-bold hover:bg-blue-50 transition shadow-lg disabled:opacity-70"
+                                onClick={handleAnalyze}
+                                disabled={loading || (!useFileUpload && !cvText.trim()) || (useFileUpload && !cvFile)}
+                                className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-lg shadow-lg shadow-blue-500/30 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-3"
                             >
-                                {saving ? (
+                                {loading ? (
                                     <>
-                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Saving...
+                                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                                        Analyzing Your Profile...
                                     </>
                                 ) : (
                                     <>
-                                        🚀 Start This Journey
+                                        <span>Analyze Career Path</span>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                     </>
                                 )}
                             </button>
+                        </div>
+                    </div>
 
-                            <button
-                                onClick={() => window.print()}
-                                className="inline-block bg-blue-700 text-white px-8 py-3 rounded-lg font-bold hover:bg-blue-800 transition shadow-lg"
-                            >
-                                📄 Print
-                            </button>
+                    {/* Right Column: Info */}
+                    <div className="space-y-6">
+                        <div className="bg-gradient-to-br from-indigo-900 to-blue-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full blur-[60px] opacity-10 -translate-y-1/2 translate-x-1/2"></div>
+                            <h3 className="text-xl font-bold mb-4 flex items-center relative z-10">
+                                <span className="mr-2">🚀</span> Unlock Your Potential
+                            </h3>
+                            <ul className="space-y-4 text-indigo-100 text-sm relative z-10">
+                                <li className="flex items-start">
+                                    <svg className="w-5 h-5 mr-2 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                    <span><strong>Current Positioning:</strong> Understand where you stand in the market.</span>
+                                </li>
+                                <li className="flex items-start">
+                                    <svg className="w-5 h-5 mr-2 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                    <span><strong>Skill Gap Analysis:</strong> Identify missing skills to reach the next level.</span>
+                                </li>
+                                <li className="flex items-start">
+                                    <svg className="w-5 h-5 mr-2 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                    <span><strong>Personalized Roadmap:</strong> Get a step-by-step plan to achieve your goals.</span>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
-            )}
+
+                {/* Results Section */}
+                {result && (
+                    <div className="space-y-8 animate-fade-in">
+                        
+                        {/* 1. Current Positioning */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                            <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center">
+                                <span className="bg-blue-100 text-blue-600 rounded-xl w-10 h-10 flex items-center justify-center mr-3 text-xl">
+                                    📍
+                                </span>
+                                Current Positioning
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                                <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
+                                    <p className="text-sm text-slate-500 mb-1 font-medium uppercase tracking-wide">Role</p>
+                                    <p className="text-xl font-bold text-slate-900">{result.current_positioning.role}</p>
+                                </div>
+                                <div className="bg-green-50 p-5 rounded-xl border border-green-100">
+                                    <p className="text-sm text-slate-500 mb-1 font-medium uppercase tracking-wide">Level</p>
+                                    <p className="text-xl font-bold text-slate-900">{result.current_positioning.level}</p>
+                                </div>
+                                <div className="bg-purple-50 p-5 rounded-xl border border-purple-100">
+                                    <p className="text-sm text-slate-500 mb-1 font-medium uppercase tracking-wide">Salary Potential</p>
+                                    <p className="text-xl font-bold text-slate-900">{result.current_positioning.salary_potential}</p>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-100">
+                                <p className="text-sm text-slate-500 mb-2 font-bold uppercase tracking-wide">Professional Summary</p>
+                                <p className="text-slate-700 leading-relaxed">{result.current_positioning.summary}</p>
+                            </div>
+                        </div>
+
+                        {/* 2. Skill Gaps */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                            <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center">
+                                <span className="bg-amber-100 text-amber-600 rounded-xl w-10 h-10 flex items-center justify-center mr-3 text-xl">
+                                    ⚡
+                                </span>
+                                Skill Gap Analysis
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {result.skill_gap.map((skill, index) => (
+                                    <div key={index} className="border border-slate-200 rounded-xl p-5 hover:shadow-md transition bg-white">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <h4 className="font-bold text-slate-900 text-lg">{skill.skill}</h4>
+                                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${getPriorityColor(skill.priority)}`}>
+                                                {skill.priority}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-slate-600">
+                                            Status: <span className="font-semibold text-slate-900">{skill.status}</span>
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 3. Career Paths */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                            <h3 className="text-2xl font-bold text-slate-900 mb-6 flex items-center">
+                                <span className="bg-green-100 text-green-600 rounded-xl w-10 h-10 flex items-center justify-center mr-3 text-xl">
+                                    🎯
+                                </span>
+                                Recommended Career Paths
+                            </h3>
+                            <div className="space-y-6">
+                                {result.paths.map((path, index) => (
+                                    <div key={index} className="border border-slate-200 rounded-xl p-6 hover:border-blue-300 hover:shadow-md transition bg-slate-50/50">
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+                                            <div>
+                                                <h4 className="text-xl font-bold text-slate-900">{path.name}</h4>
+                                                <p className="text-sm text-slate-500 mt-1">
+                                                    ⏱️ Timeline: <span className="font-semibold text-slate-700">{path.time}</span>
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+                                                <div className={`text-2xl font-bold mr-2 ${getMatchColor(path.match)}`}>
+                                                    {path.match}%
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-400 uppercase">Match</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="bg-green-50/50 p-4 rounded-xl border border-green-100">
+                                                <h5 className="font-bold text-green-800 mb-3 flex items-center text-sm uppercase tracking-wide">
+                                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                                                    Pros
+                                                </h5>
+                                                <ul className="space-y-2">
+                                                    {path.pros.map((pro, i) => (
+                                                        <li key={i} className="text-sm text-slate-700 flex items-start">
+                                                            <span className="mr-2 text-green-500">•</span> {pro}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div className="bg-red-50/50 p-4 rounded-xl border border-red-100">
+                                                <h5 className="font-bold text-red-800 mb-3 flex items-center text-sm uppercase tracking-wide">
+                                                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    Cons
+                                                </h5>
+                                                <ul className="space-y-2">
+                                                    {path.cons.map((con, i) => (
+                                                        <li key={i} className="text-sm text-slate-700 flex items-start">
+                                                            <span className="mr-2 text-red-500">•</span> {con}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 4. Roadmap */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                            <h3 className="text-2xl font-bold text-slate-900 mb-8 flex items-center">
+                                <span className="bg-purple-100 text-purple-600 rounded-xl w-10 h-10 flex items-center justify-center mr-3 text-xl">
+                                    🗺️
+                                </span>
+                                Your Career Roadmap
+                            </h3>
+                            <div className="relative pl-4 md:pl-8">
+                                {/* Timeline line */}
+                                <div className="absolute left-4 md:left-8 top-4 bottom-4 w-0.5 bg-slate-200"></div>
+                                
+                                {result.roadmap.map((phase, index) => (
+                                    <div key={index} className="relative pl-8 md:pl-12 pb-10 last:pb-0">
+                                        {/* Timeline dot */}
+                                        <div className="absolute left-2 md:left-6 top-0 w-4 h-4 rounded-full bg-blue-600 border-4 border-white shadow-sm z-10 -translate-x-1/2"></div>
+                                        
+                                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 hover:border-blue-300 transition">
+                                            <h4 className="text-lg font-bold text-slate-900 mb-4 flex items-center">
+                                                <span className="text-blue-600 mr-2">📅</span> {phase.phase}
+                                            </h4>
+                                            <div className="space-y-3">
+                                                {phase.actions.map((action, i) => (
+                                                    <div key={i} className="flex items-start bg-white p-4 rounded-lg border border-slate-100 shadow-sm">
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold mr-3 mt-0.5 border ${
+                                                            action.type === 'Learn' 
+                                                                ? 'bg-indigo-50 text-indigo-700 border-indigo-100' 
+                                                                : 'bg-amber-50 text-amber-700 border-amber-100'
+                                                        }`}>
+                                                            {action.type}
+                                                        </span>
+                                                        <p className="text-slate-700 text-sm leading-relaxed">{action.content}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl shadow-xl p-8 text-center text-white relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-full bg-white opacity-5 pattern-dots"></div>
+                            <h3 className="text-2xl font-bold mb-4 relative z-10">Ready to Start Your Journey?</h3>
+                            <p className="mb-8 text-slate-300 max-w-2xl mx-auto relative z-10">
+                                Save this roadmap to your personal dashboard to track your daily progress and achieve your career goals.
+                            </p>
+                            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 relative z-10">
+                                <button
+                                    onClick={handleApplyRoadmap}
+                                    disabled={saving}
+                                    className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-900/30 transition-all transform hover:-translate-y-0.5 disabled:opacity-70 disabled:transform-none flex items-center justify-center"
+                                >
+                                    {saving ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="mr-2">🚀</span> Start This Journey
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => window.print()}
+                                    className="w-full sm:w-auto px-8 py-3.5 bg-white/10 backdrop-blur-sm border border-white/20 text-white rounded-xl font-bold hover:bg-white/20 transition flex items-center justify-center"
+                                >
+                                    <span className="mr-2">🖨️</span> Print Roadmap
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

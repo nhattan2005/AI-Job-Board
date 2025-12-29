@@ -443,6 +443,18 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP;
 COMMENT ON COLUMN users.reset_token IS 'Token for password reset';
 COMMENT ON COLUMN users.reset_token_expires IS 'Expiration time for reset token';
 
+-- Reports Table
+CREATE TABLE reports (
+    id SERIAL PRIMARY KEY,
+    reporter_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    target_type VARCHAR(20) NOT NULL, -- 'job' or 'user' (employer/candidate)
+    target_id INTEGER NOT NULL, -- job_id or user_id
+    reason VARCHAR(50) NOT NULL,
+    description TEXT,
+    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'resolved', 'dismissed'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Verify
 SELECT column_name, data_type 
 FROM information_schema.columns 
