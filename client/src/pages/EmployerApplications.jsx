@@ -12,9 +12,10 @@ const EmployerApplications = () => {
     const [error, setError] = useState(null);
     const [filters, setFilters] = useState({
         status: 'all',
-        keyword: ''
+        keyword: '',
+        sortBy: 'date' // 👈 THÊM: Mặc định sắp xếp theo ngày
     });
-    const [searchKeyword, setSearchKeyword] = useState(''); // 👈 Thêm state tạm cho input
+    const [searchKeyword, setSearchKeyword] = useState(''); 
     
     const [viewingCV, setViewingCV] = useState(null);
     const [expandedAppId, setExpandedAppId] = useState(null);
@@ -133,7 +134,7 @@ const EmployerApplications = () => {
         );
     };
 
-    // ✅ CLIENT-SIDE FILTERING - BẮT BUỘC PHẢI CÓ
+    // ✅ CLIENT-SIDE FILTERING & SORTING
     const filteredApplications = applications.filter(app => {
         const matchesStatus = filters.status === 'all' || app.status === filters.status;
         
@@ -141,10 +142,21 @@ const EmployerApplications = () => {
         if (filters.keyword.trim()) {
             const keywords = filters.keyword.toLowerCase().split(',').map(k => k.trim()).filter(k => k);
             const cvText = (app.cv_text || '').toLowerCase();
-            matchesKeyword = keywords.some(keyword => cvText.includes(keyword));
+            // 👇 SỬA: Đổi .some() (OR) thành .every() (AND)
+            matchesKeyword = keywords.every(keyword => cvText.includes(keyword));
         }
         
         return matchesStatus && matchesKeyword;
+    }).sort((a, b) => {
+        // 👇 THÊM LOGIC SẮP XẾP TẠI ĐÂY
+        if (filters.sortBy === 'match_score_desc') {
+            return (b.match_score || 0) - (a.match_score || 0); // Cao -> Thấp
+        }
+        if (filters.sortBy === 'match_score_asc') {
+            return (a.match_score || 0) - (b.match_score || 0); // Thấp -> Cao
+        }
+        // Mặc định: Mới nhất lên đầu
+        return new Date(b.applied_at) - new Date(a.applied_at);
     });
 
     const toggleSelect = (appId) => {
@@ -200,7 +212,8 @@ const EmployerApplications = () => {
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">🔍 Filter Candidates</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 👇 SỬA: Đổi grid-cols-2 thành grid-cols-3 để chứa thêm ô Sort */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Status</label>
                         <select
@@ -214,6 +227,20 @@ const EmployerApplications = () => {
                             <option value="accepted">Accepted</option>
                             <option value="rejected">Rejected</option>
                             <option value="interview_scheduled">Interview Scheduled</option>
+                        </select>
+                    </div>
+
+                    {/* 👇 THÊM: Ô Sort By */}
+                    <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Sort By</label>
+                        <select
+                            value={filters.sortBy}
+                            onChange={(e) => setFilters({ ...filters, sortBy: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                            <option value="date">Newest First</option>
+                            <option value="match_score_desc">Match Score (High to Low)</option>
+                            <option value="match_score_asc">Match Score (Low to High)</option>
                         </select>
                     </div>
 
@@ -259,7 +286,8 @@ const EmployerApplications = () => {
                             )}
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                            <span className="font-semibold">Tip:</span> Use comma for OR search (e.g. "React, Python")
+                            {/* 👇 SỬA: Cập nhật hướng dẫn cho người dùng */}
+                            <span className="font-semibold">Tip:</span> Use comma for AND search (e.g. "React, Python" finds CVs with BOTH)
                         </p>
                     </div>
                 </div>
@@ -341,6 +369,22 @@ const EmployerApplications = () => {
                                         <div className="flex items-center gap-3 mb-1">
                                             <h3 className="text-lg font-bold text-slate-900 truncate">{app.candidate_name}</h3>
                                             {getStatusBadge(app.status)}
+
+                                            {/* 👇 THÊM ĐOẠN NÀY: Hiển thị Match Score */}
+                                            {app.match_score && (
+                                                <span className={`flex items-center px-2 py-0.5 rounded text-xs font-bold border ${
+                                                    app.match_score >= 80 ? 'bg-green-50 text-green-700 border-green-200' :
+                                                    app.match_score >= 50 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                                    'bg-red-50 text-red-700 border-red-200'
+                                                }`}>
+                                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                                    </svg>
+                                                    {app.match_score}%
+                                                </span>
+                                            )}
+                                            {/* 👆 KẾT THÚC ĐOẠN THÊM */}
+
                                         </div>
                                         <div className="flex items-center gap-4 text-sm text-slate-500">
                                             <span className="flex items-center truncate">

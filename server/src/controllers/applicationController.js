@@ -33,7 +33,8 @@ const applyForJob = async (req, res) => {
         }
 
         const candidate_id = req.user.id;
-        const { job_id, cover_letter } = req.body;
+        // 👇 THÊM: Lấy match_score từ req.body
+        const { job_id, cover_letter, match_score } = req.body;
 
         console.log('📤 Processing CV upload for user:', candidate_id);
 
@@ -92,11 +93,18 @@ const applyForJob = async (req, res) => {
         }
 
         // 5. Tạo application
+        // 👇 CẬP NHẬT: Thêm cột match_score vào câu lệnh INSERT
         const appResult = await db.query(
-            `INSERT INTO applications (job_id, candidate_id, cv_id, cover_letter, status) 
-             VALUES ($1, $2, $3, $4, 'pending') 
+            `INSERT INTO applications (job_id, candidate_id, cv_id, cover_letter, status, match_score) 
+             VALUES ($1, $2, $3, $4, 'pending', $5) 
              RETURNING id, applied_at`,
-            [job_id, candidate_id, cv_id, cover_letter || '']
+            [
+                job_id, 
+                candidate_id, 
+                cv_id, 
+                cover_letter || '',
+                match_score ? parseFloat(match_score) : null // Lưu điểm nếu có
+            ]
         );
 
         console.log('✅ Application created, ID:', appResult.rows[0].id);
