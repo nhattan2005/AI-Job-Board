@@ -60,7 +60,8 @@ const EmployerDashboard = () => {
     }
 
     return (
-        <div className="max-w-7xl mx-auto">
+        // 👇 THÊM: py-8 px-4 để tạo khoảng cách
+        <div className="max-w-7xl mx-auto py-8 px-4">
             {/* Header */}
             <div className="mb-8">
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">

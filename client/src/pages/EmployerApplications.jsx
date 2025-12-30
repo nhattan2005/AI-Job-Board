@@ -22,7 +22,8 @@ const EmployerApplications = () => {
     const [selectedApplications, setSelectedApplications] = useState([]);
     const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
     const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
-    const [selectedApplicationForInterview, setSelectedApplicationForInterview] = useState(null);
+    // 👇 SỬA: Đổi thành mảng để chứa nhiều application
+    const [selectedApplicationsForInterview, setSelectedApplicationsForInterview] = useState([]);
 
     useEffect(() => {
         fetchJobAndApplications();
@@ -70,7 +71,16 @@ const EmployerApplications = () => {
     };
 
     const openInterviewModal = (app) => {
-        setSelectedApplicationForInterview(app);
+        // Nếu truyền vào 1 app (từ nút Interview trên card), tạo mảng chứa 1 phần tử
+        setSelectedApplicationsForInterview([app]);
+        setIsInterviewModalOpen(true);
+    };
+
+    // 👇 THÊM: Hàm mở modal cho nhiều người (từ nút Bulk Action)
+    const openBulkInterviewModal = () => {
+        // Lấy danh sách object application từ danh sách ID đang chọn
+        const selectedAppsObjects = applications.filter(app => selectedApplications.includes(app.id));
+        setSelectedApplicationsForInterview(selectedAppsObjects);
         setIsInterviewModalOpen(true);
     };
 
@@ -185,12 +195,10 @@ const EmployerApplications = () => {
     if (error) return <div className="text-center py-20 text-red-600">{error}</div>;
 
     return (
-        <div className="max-w-6xl mx-auto pb-20">
+        // 👇 THÊM: pt-8 px-4 (giữ nguyên pb-20 cũ)
+        <div className="max-w-6xl mx-auto pt-8 pb-20 px-4">
             <div className="mb-8">
-                <Link to="/employer/dashboard" className="text-slate-500 hover:text-blue-600 font-medium flex items-center mb-4 transition">
-                    <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
-                    Back to Dashboard
-                </Link>
+                
                 <div className="flex justify-between items-end">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 mb-2">{job?.title}</h1>
@@ -326,18 +334,6 @@ const EmployerApplications = () => {
                         </button>
                     ))}
                 </div>
-
-                {selectedApplications.length > 0 && (
-                    <div className="flex items-center gap-3 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 animate-fade-in">
-                        <span className="text-sm font-bold text-blue-800">{selectedApplications.length} selected</span>
-                        <button onClick={() => setIsEmailModalOpen(true)} className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 font-semibold shadow-sm">
-                            Send Email
-                        </button>
-                        <button onClick={clearSelection} className="text-slate-400 hover:text-slate-600">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-                )}
             </div>
 
             <div className="space-y-4">
@@ -380,7 +376,7 @@ const EmployerApplications = () => {
                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                                     </svg>
-                                                    {app.match_score}%
+                                                    {app.match_score}%>
                                                 </span>
                                             )}
                                             {/* 👆 KẾT THÚC ĐOẠN THÊM */}
@@ -561,14 +557,72 @@ const EmployerApplications = () => {
                 isOpen={isInterviewModalOpen}
                 onClose={() => {
                     setIsInterviewModalOpen(false);
-                    setSelectedApplicationForInterview(null);
+                    setSelectedApplicationsForInterview([]); // Reset về mảng rỗng
                 }}
-                application={selectedApplicationForInterview}
+                applications={selectedApplicationsForInterview} // 👇 Truyền mảng vào prop mới
                 jobTitle={job?.title}
                 onSent={(result) => {
                     fetchJobAndApplications();
+                    clearSelection(); // Xóa selection sau khi gửi thành công
                 }}
             />
+
+            {/* 👇 THÊM ĐOẠN NÀY: Thanh thao tác nổi ở dưới cùng (Floating Bar) */}
+            {selectedApplications.length > 0 && (
+                <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center gap-6 animate-fade-in-up border border-slate-700 backdrop-blur-sm bg-opacity-95">
+                    <div className="flex items-center gap-2">
+                        <span className="bg-white text-slate-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                            {selectedApplications.length}
+                        </span>
+                        <span className="font-semibold text-sm">Selected</span>
+                    </div>
+                    
+                    <div className="h-4 w-px bg-slate-600"></div>
+
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={openBulkInterviewModal} 
+                            className="flex items-center gap-2 text-sm font-bold hover:text-purple-300 transition group"
+                        >
+                            <span className="p-1.5 bg-purple-600 rounded-full group-hover:bg-purple-500 transition">
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </span>
+                            <span>Interview</span>
+                        </button>
+
+                        <button 
+                            onClick={() => setIsEmailModalOpen(true)} 
+                            className="flex items-center gap-2 text-sm font-bold hover:text-blue-300 transition group ml-2"
+                        >
+                            <span className="p-1.5 bg-blue-600 rounded-full group-hover:bg-blue-500 transition">
+                                <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </span>
+                            <span>Email</span>
+                        </button>
+                    </div>
+
+                    <div className="h-4 w-px bg-slate-600"></div>
+
+                    <button 
+                        onClick={clearSelection}
+                        className="text-slate-400 hover:text-white transition flex items-center gap-1 text-xs font-medium"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Cancel
+                    </button>
+                </div>
+            )}
+            {/* 👆 KẾT THÚC ĐOẠN THÊM */}
+
+            <div className="bg-white p-8 shadow-sm min-h-full whitespace-pre-wrap font-mono text-sm text-slate-700 rounded-lg border border-slate-200">
+                {viewingCV?.cv_text}
+            </div>
         </div>
     );
 };

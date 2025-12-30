@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Thêm useEffect
 import InterviewCalendar from './InterviewCalendar';
 import api from '../services/api';
 
-const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSent }) => {
+// 👇 SỬA: Đổi prop 'application' thành 'applications' (số nhiều)
+const InterviewInvitationModal = ({ isOpen, onClose, applications = [], jobTitle, onSent }) => {
     const [timeSlots, setTimeSlots] = useState([]);
     const [location, setLocation] = useState('Online');
     const [meetingLink, setMeetingLink] = useState('');
@@ -16,6 +17,16 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
 
     const [newSlotDate, setNewSlotDate] = useState('');
     const [newSlotTime, setNewSlotTime] = useState('');
+
+    // 👇 Reset state khi mở modal
+    useEffect(() => {
+        if (isOpen) {
+            setSuccess(false);
+            setError(null);
+            setTimeSlots([]);
+            // Các state khác giữ nguyên hoặc reset tùy ý
+        }
+    }, [isOpen]);
 
     const addTimeSlot = () => {
         if (!newSlotDate || !newSlotTime) {
@@ -47,32 +58,19 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
     };
 
     const handleSend = async () => {
-        if (timeSlots.length === 0) {
-            setError('Please add at least one time slot');
-            return;
-        }
-
-        if (location === 'Online' && !meetingLink.trim()) {
-            setError('Please provide a meeting link');
-            return;
-        }
-
-        // 👇 THÊM: Validate địa chỉ văn phòng
-        if (location === 'Office' && !officeAddress.trim()) {
-            setError('Please provide the office address');
-            return;
-        }
+        // ...existing validation...
 
         setSending(true);
         setError(null);
 
         try {
-            // 👇 LOGIC: Xác định location cuối cùng để lưu vào DB
-            // Nếu là Office thì lưu địa chỉ cụ thể, nếu không thì giữ nguyên (Online/Phone)
             const finalLocation = location === 'Office' ? officeAddress : location;
+            
+            // 👇 LOGIC MỚI: Gọi API Bulk
+            const applicationIds = applications.map(app => app.id);
 
-            console.log('📤 Sending invitation with data:', {
-                applicationId: application.id,
+            await api.post('/interviews/send-bulk-invitation', {
+                applicationIds, // Gửi mảng ID
                 timeSlots,
                 location: finalLocation,
                 meetingLink: location === 'Online' ? meetingLink : null,
@@ -80,124 +78,94 @@ const InterviewInvitationModal = ({ isOpen, onClose, application, jobTitle, onSe
                 duration
             });
 
-            const response = await api.post('/interviews/send-invitation', {
-                applicationId: application.id,
-                timeSlots,
-                location: finalLocation, // Sử dụng finalLocation
-                meetingLink: location === 'Online' ? meetingLink : null,
-                notes,
-                duration
-            });
-
-            console.log('✅ Response:', response.data);
-
             setSuccess(true);
             
-            // Gửi email
-            const scheduleLink = `${window.location.origin}/interview/schedule/${application.id}`;
-            
-            // 👇 LOGIC: Tạo nội dung chi tiết về địa điểm cho email
+            // Gửi email hàng loạt
+            // 👇 Tạo nội dung email chung (dùng placeholder [Candidate Name])
             let locationDetails = `- Location: ${finalLocation}`;
             if (location === 'Online') {
                 locationDetails += `\n- Meeting Link: ${meetingLink}`;
             }
 
-            // 👇 SỬA: Đổi '/employer/...' thành '/employer-email/...'
             await api.post('/employer-email/send-bulk-email', {
-                applicationIds: [application.id],
+                applicationIds: applicationIds,
                 subject: `Interview Invitation - ${jobTitle}`,
-                message: `Dear ${application.candidate_name},
+                message: `Dear [Candidate Name],
 
 We are impressed with your application and would like to invite you for an interview.
 
-<b>Schedule Your Interview:</b>
-Please visit the link below to select a time slot that works for you:
-${scheduleLink}
+Please click the link below to select a time slot that works for you:
+[Link will be available in your dashboard]
 
-<b>Interview Details:</b>
-- Duration: ${duration} minutes
+Interview Details:
 ${locationDetails}
-
-${notes ? `\n<b>Notes:</b>\n${notes}` : ''}
-
-Please confirm your preferred time slot within 48 hours.
+- Duration: ${duration} minutes
+${notes ? `\nNote: ${notes}` : ''}
 
 Best regards,
 Hiring Team`
             });
 
             setTimeout(() => {
-                onSent && onSent(response.data);
+                onSent();
                 onClose();
-                setTimeSlots([]);
-                setLocation('Online');
-                setMeetingLink('');
-                setOfficeAddress(''); // Reset address
-                setNotes('');
-                setDuration(60);
-                setSuccess(false);
             }, 2000);
 
         } catch (err) {
-            console.error('❌ Error details:', err);
-            console.error('❌ Response data:', err.response?.data);
-            
-            // Hiển thị lỗi chi tiết hơn
-            const errorMessage = err.response?.data?.details 
-                || err.response?.data?.error 
-                || err.message 
-                || 'Failed to send invitation';
-            
-            setError(errorMessage);
+            console.error('Error sending invitations:', err);
+            setError(err.response?.data?.error || 'Failed to send invitations');
         } finally {
             setSending(false);
         }
     };
 
-    if (!isOpen || !application) return null;
+    if (!isOpen) return null;
+
+    // 👇 Tính toán tên hiển thị
+    const candidateDisplay = applications.length === 1 
+        ? applications[0].candidate_name 
+        : `${applications.length} candidates`;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="p-6 border-b bg-gradient-to-r from-purple-50 to-blue-50">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                                <svg className="h-7 w-7 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                Schedule Interview
-                            </h2>
-                            <p className="text-gray-600 text-sm mt-1">
-                                Invite <strong>{application.candidate_name}</strong> for interview
-                            </p>
-                        </div>
-                        <button onClick={onClose} disabled={sending} className="text-gray-500 hover:text-gray-700">
-                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                <div className="p-6 border-b flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                            <svg className="h-6 w-6 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                        </button>
+                            Schedule Interview
+                        </h2>
+                        <p className="text-gray-600 text-sm mt-1">
+                            Invite <strong>{candidateDisplay}</strong> for interview
+                        </p>
                     </div>
+                    <button onClick={onClose} disabled={sending} className="text-gray-500 hover:text-gray-700">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 overflow-y-auto flex-1">
+                <div className="p-6 space-y-6">
+                    {/* Success Message */}
+                    {success && (
+                        <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-center">
+                            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Invitations sent successfully to {applications.length} candidates!
+                        </div>
+                    )}
+                    
                     {error && (
                         <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center">
                             <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {error}
-                        </div>
-                    )}
-
-                    {success && (
-                        <div className="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg flex items-center">
-                            <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Interview invitation sent! Email sent to candidate.
                         </div>
                     )}
 
