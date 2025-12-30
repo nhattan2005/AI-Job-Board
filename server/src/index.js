@@ -17,8 +17,9 @@ const mockInterviewRoutes = require('./routes/mockInterviewRoutes');
 const employerEmailRoutes = require('./routes/employerEmailRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
-const favoriteRoutes = require('./routes/favoriteRoutes'); // 👈 THÊM DÒNG NÀY
-const notificationRoutes = require('./routes/notificationRoutes'); // 👈 THÊM
+const favoriteRoutes = require('./routes/favoriteRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const reportRoutes = require('./routes/reportRoutes'); // 👈 Add this
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -65,9 +66,10 @@ app.use('/api/interviews', interviewRoutes);
 app.use('/api/mock-interview', mockInterviewRoutes);
 app.use('/api/employer-email', employerEmailRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/banners', bannerRoutes); // 👈 THÊM
-app.use('/api/favorites', favoriteRoutes); // 👈 DÒNG NÀY ĐÃ CÓ, CHỈ CẦN THÊM IMPORT
-app.use('/api/notifications', notificationRoutes); // 👈 THÊM
+app.use('/api/banners', bannerRoutes);
+app.use('/api/favorites', favoriteRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/reports', reportRoutes); // 👈 Add this
 
 // Health check
 app.get('/api/health', (req, res) => {

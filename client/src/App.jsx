@@ -39,7 +39,8 @@ import PracticeInterviewSetup from './pages/PracticeInterviewSetup'; // 👈 TH�
 import PracticeInterviewRoom from './pages/PracticeInterviewRoom'; // 👈 THÊM
 import NotificationsPage from './pages/NotificationsPage'; // 👈 ĐẢM BẢO DÒNG NÀY TỒN TẠI
 import EmployerPublicProfile from './pages/EmployerPublicProfile'; // 👈 THÊM
-import AdminManagement from './pages/AdminManagement'; // 👈 THÊM IMPORT
+import AdminManagement from './pages/AdminManagement';
+import AdminReports from './pages/AdminReports'; // 👈 Import
 
 const App = () => {
     return (
@@ -276,6 +277,15 @@ const App = () => {
                                 element={
                                     <ProtectedRoute requiredRole="admin">
                                         <AdminManagement />
+                                    </ProtectedRoute>
+                                } 
+                            />
+                            {/* 👇 Add Report Route */}
+                            <Route 
+                                path="/admin/reports" 
+                                element={
+                                    <ProtectedRoute requiredRole="admin">
+                                        <AdminReports />
                                     </ProtectedRoute>
                                 } 
                             />
