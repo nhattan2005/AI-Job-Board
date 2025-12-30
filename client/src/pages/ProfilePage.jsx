@@ -93,7 +93,8 @@ const ProfilePage = () => {
             setError('');
             console.log('📤 Uploading avatar...');
             
-            const response = await api.post('/auth/avatar', formData, {
+            // 👇 SỬA LỖI TẠI ĐÂY: Đổi '/auth/avatar' thành '/auth/upload-avatar'
+            const response = await api.post('/auth/upload-avatar', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             
