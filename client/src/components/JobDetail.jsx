@@ -151,6 +151,7 @@ const JobDetail = () => {
 
     const handleFileChange = (e) => {
         setCvFile(e.target.files[0]);
+        // Reset score khi chọn file mới để bắt buộc tính lại
         setMatchScore(null);
         setAiSuggestions(null);
     };
@@ -158,6 +159,13 @@ const JobDetail = () => {
     // Unified Analysis Function
     const handleAnalyzeCV = async () => {
         if (!cvFile) return;
+
+        // 👇 THÊM: Kiểm tra nếu đã có matchScore thì không tính lại
+        if (matchScore !== null) {
+            console.log("✅ Using cached Match Score:", matchScore);
+            return; // Dừng hàm, không gọi API nữa
+        }
+
         setAnalyzing(true);
         
         const formData = new FormData();
@@ -203,7 +211,12 @@ const JobDetail = () => {
         formData.append('job_id', id); 
         
         formData.append('coverLetter', coverLetter);
-        if (matchScore) formData.append('matchScore', matchScore);
+        
+        // 👇 Đảm bảo gửi matchScore nếu đã có
+        if (matchScore !== null) {
+            formData.append('match_score', matchScore);
+        }
+        
         if (aiSuggestions) formData.append('aiAdvice', JSON.stringify(aiSuggestions));
 
         try {
