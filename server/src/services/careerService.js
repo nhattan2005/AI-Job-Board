@@ -2,10 +2,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const generateCareerPath = async (cvText) => {
+// 👇 CẬP NHẬT: Thêm tham số targetGoal vào hàm
+const generateCareerPath = async (cvText, targetGoal = '') => {
     try {
         console.log("CV text length:", cvText.length);
-        console.log("Initializing Gemini model for career analysis...");
+        if (targetGoal) console.log("🎯 Target Goal for AI:", targetGoal);
 
         const model = genAI.getGenerativeModel({ 
             model: "gemini-flash-latest",
@@ -17,8 +18,28 @@ const generateCareerPath = async (cvText) => {
             }
         });
 
+        // 👇 LOGIC MỚI: Xây dựng chỉ dẫn (Instruction) dựa trên targetGoal
+        let contextInstruction = "";
+        if (targetGoal && targetGoal.trim()) {
+            contextInstruction = `
+*** CRITICAL INSTRUCTION ***
+The user has explicitly set a TARGET GOAL: "${targetGoal}".
+You MUST ignore generic career paths and focus ENTIRELY on how to get this user from their current state to "${targetGoal}".
+
+1. "skill_gap": List ONLY the skills they are missing to become a "${targetGoal}".
+2. "roadmap": Create a step-by-step plan specifically to achieve "${targetGoal}".
+3. "paths": The first path in the list MUST be "${targetGoal}".
+`;
+        } else {
+            contextInstruction = `
+The user has not specified a target role. Analyze the CV to suggest the best matching career paths based on their current skills and market trends.
+`;
+        }
+
         const prompt = `
 You are an expert AI Career Counselor. Analyze the following CV text and generate a personalized career development path.
+
+${contextInstruction}
 
 CV Text:
 "${cvText}"
@@ -29,9 +50,6 @@ CRITICAL RULES:
 1. Use DOUBLE QUOTES for all keys and string values.
 2. NO trailing commas after the last item in arrays or objects.
 3. NO comments inside the JSON.
-4. ALL keys must be lowercase with underscores (snake_case).
-5. Ensure all brackets are properly closed.
-6. **IMPORTANT**: Remove ALL trailing commas before closing brackets.
 
 JSON Structure:
 {
@@ -73,48 +91,25 @@ Provide the complete analysis based on the CV content.
 
         console.log("Sending request to Gemini API...");
         const result = await model.generateContent(prompt);
+        const response = await result.response;
+        let text = response.text();
 
-        // 👇 SỬA: Truy cập đúng structure của Gemini API response
         console.log("Received response from Gemini");
 
-        // Kiểm tra xem có response không
-        if (!result.response || !result.response.candidates || result.response.candidates.length === 0) {
-            console.error("❌ No candidates in response:", JSON.stringify(result, null, 2));
-            throw new Error("AI did not return any response candidates.");
-        }
-
-        const candidate = result.response.candidates[0];
-
-        // Kiểm tra xem có content không
-        if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
-            console.error("❌ No content parts in candidate:", JSON.stringify(candidate, null, 2));
-            throw new Error("AI response candidate has no content parts.");
-        }
-
-        // 👇 ĐỌC TEXT TỪ PARTS
-        let text = candidate.content.parts[0].text.trim();
-
         // Clean up response
-        text = text.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+        text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
-        // Loại bỏ trailing commas
-        text = text.replace(/,(\s*[}\]])/g, '$1');
-        text = text.replace(/,(\s*\n\s*[}\]])/g, '$1');
-
-        // Loại bỏ comments trong JSON (nếu có)
-        text = text.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
-
-        try {
-            const analysis = JSON.parse(text);
-            return analysis;
-        } catch (parseError) {
-            console.error("❌ JSON Parse Error. Raw Text:", text);
-            console.error("Parse Error Details:", parseError.message);
-            throw new Error("AI response format was invalid.");
+        const jsonStart = text.indexOf('{');
+        const jsonEnd = text.lastIndexOf('}');
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+            text = text.substring(jsonStart, jsonEnd + 1);
         }
+
+        const analysis = JSON.parse(text);
+        return analysis;
 
     } catch (error) {
-        console.error("❌ Career path generation error:", error);
+        console.error("Error in AI service:", error);
         throw error;
     }
 };

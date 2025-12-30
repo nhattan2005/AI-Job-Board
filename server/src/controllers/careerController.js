@@ -1,12 +1,11 @@
 const careerService = require('../services/careerService');
+const db = require('../config/database');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const db = require('../config/database'); // Đảm bảo import db
 
 // Helper to extract text from file buffer
 const extractTextFromFile = async (file) => {
     const { buffer, mimetype } = file;
-    
     try {
         if (mimetype === 'text/plain') {
             return buffer.toString('utf-8');
@@ -19,74 +18,58 @@ const extractTextFromFile = async (file) => {
             const result = await mammoth.extractRawText({ buffer });
             return result.value;
         }
-        else {
-            throw new Error('Unsupported file type. Only PDF, DOCX, and TXT are supported.');
-        }
+        return '';
     } catch (error) {
         console.error('Error extracting text:', error);
-        throw new Error('Failed to extract text from file: ' + error.message);
+        throw new Error('Failed to extract text from file');
     }
 };
 
-// Generate Career Path from CV
+// 👇 SỬA LẠI HÀM NÀY: Phải nhận (req, res)
 const generateCareerPath = async (req, res) => {
     try {
         let cvText;
+        // Lấy targetGoal từ body
+        const { targetGoal } = req.body;
 
-        // Option 1: CV text từ body (for testing)
+        // Option 1: CV text từ body
         if (req.body.cvText) {
             cvText = req.body.cvText;
         }
         // Option 2: CV file upload
         else if (req.file) {
             cvText = await extractTextFromFile(req.file);
-        }
-        else {
-            return res.status(400).json({ 
-                error: 'CV is required',
-                details: 'Please provide cvText in body or upload a CV file'
-            });
+        } else {
+            return res.status(400).json({ error: 'No CV provided' });
         }
 
         if (!cvText || cvText.trim().length === 0) {
             return res.status(400).json({ 
                 error: 'CV text is empty',
-                details: 'Could not extract text from the file or text is empty'
+                details: 'Could not extract text from the file'
             });
         }
 
         console.log('=== Generating Career Path ===');
-        console.log('CV text length:', cvText.length);
+        if (targetGoal) console.log('🎯 Target Goal:', targetGoal);
 
-        // Call career service
-        const careerPath = await careerService.generateCareerPath(cvText);
+        // 👇 GỌI SERVICE (Logic AI nằm bên file service)
+        const careerPath = await careerService.generateCareerPath(cvText, targetGoal);
 
         console.log('✓ Career path generated successfully');
 
+        // Trả về kết quả cho Client
         res.json({
             success: true,
             data: careerPath
         });
+
     } catch (error) {
-        console.error('❌ Error generating career path:', error);
-        
-        if (error.status === 429 || error.message.includes('quota')) {
-            return res.status(429).json({ 
-                error: 'API quota exceeded',
-                details: 'Please wait a moment before trying again'
-            });
-        }
-        
-        if (error.status === 404 || error.message.includes('Model')) {
-            return res.status(503).json({ 
-                error: 'AI model unavailable',
-                details: 'The AI model is currently unavailable. Please try again later.'
-            });
-        }
-        
+        console.error('Error generating career path:', error);
+        // 👇 SỬA: Đảm bảo res được gọi đúng cách trong catch
         res.status(500).json({ 
             error: 'Failed to generate career path',
-            details: error.message
+            details: error.message 
         });
     }
 };
