@@ -305,8 +305,129 @@ const getInterviewByApplication = async (req, res) => {
     }
 };
 
+// 👇 THÊM HÀM MỚI: Gửi lời mời phỏng vấn hàng loạt
+const sendBulkInterviewInvitations = async (req, res) => {
+    // 👇 SỬA LỖI TẠI ĐÂY: Dùng db.pool.connect() thay vì db.connect()
+    const client = await db.pool.connect(); 
+    
+    try {
+        await client.query('BEGIN');
+        
+        const employerId = req.user.id;
+        const { applicationIds, timeSlots, location, meetingLink, notes, duration } = req.body;
+
+        if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+            return res.status(400).json({ error: 'No applications selected' });
+        }
+
+        // 1. Lấy thông tin các applications và verify quyền sở hữu
+        const appsResult = await client.query(
+            `SELECT a.id, a.job_id, a.candidate_id, j.title, u.full_name as candidate_name
+             FROM applications a
+             JOIN jobs j ON a.job_id = j.id
+             JOIN users u ON a.candidate_id = u.id
+             WHERE a.id = ANY($1) AND j.employer_id = $2`,
+            [applicationIds, employerId]
+        );
+
+        if (appsResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'No valid applications found' });
+        }
+
+        const validApplications = appsResult.rows;
+        const createdInterviews = [];
+
+        // 2. Loop qua từng application để tạo interview
+        for (const app of validApplications) {
+            // Upsert Interview
+            const interviewResult = await client.query(
+                `INSERT INTO interviews (
+                    application_id, job_id, employer_id, candidate_id, status, 
+                    location, meeting_link, notes, duration_minutes
+                )
+                 VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8)
+                 ON CONFLICT (application_id) 
+                 DO UPDATE SET 
+                    status = 'pending',
+                    location = $5,
+                    meeting_link = $6,
+                    notes = $7,
+                    duration_minutes = $8,
+                    updated_at = CURRENT_TIMESTAMP
+                 RETURNING id`,
+                [
+                    app.id, 
+                    app.job_id, 
+                    employerId, 
+                    app.candidate_id,
+                    location,
+                    meetingLink,
+                    notes,
+                    duration
+                ]
+            );
+
+            const interviewId = interviewResult.rows[0].id;
+
+            // Xóa slot cũ
+            await client.query('DELETE FROM interview_time_slots WHERE interview_id = $1', [interviewId]);
+
+            // Thêm slot mới
+            for (const slot of timeSlots) {
+                await client.query(
+                    `INSERT INTO interview_time_slots (interview_id, slot_date) VALUES ($1, $2)`,
+                    [interviewId, slot] 
+                );
+            }
+
+            // Update status application
+            await client.query(
+                `UPDATE applications SET status = 'interviewing' WHERE id = $1`,
+                [app.id]
+            );
+
+            // Tạo notification (Lưu ý: createNotification dùng db pool riêng, nên để ngoài transaction hoặc chấp nhận rủi ro nhỏ)
+            // Ở đây ta gom lại để gửi sau khi commit hoặc gửi luôn cũng được
+            createdInterviews.push({
+                candidateId: app.candidate_id,
+                jobTitle: app.title,
+                appId: app.id
+            });
+        }
+
+        await client.query('COMMIT');
+
+        // 3. Gửi notification (Sau khi commit thành công)
+        for (const item of createdInterviews) {
+            try {
+                await createNotification(
+                    item.candidateId,
+                    'interview_invite',
+                    '📅 Interview Invitation',
+                    `You have been invited to interview for ${item.jobTitle}`,
+                    `/interview/schedule/${item.appId}`
+                );
+            } catch (e) { console.error('Notif error', e); }
+        }
+
+        res.json({
+            message: `Successfully sent invitations to ${createdInterviews.length} candidates`,
+            count: createdInterviews.length
+        });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Bulk interview error:', error);
+        res.status(500).json({ error: 'Failed to send bulk invitations' });
+    } finally {
+        client.release();
+    }
+};
+
 module.exports = {
     sendInterviewInvitation,
+    sendBulkInterviewInvitations, // 👈 Export hàm mới
     confirmInterviewSlot,
     getCandidateInterviews,
     getEmployerInterviews,

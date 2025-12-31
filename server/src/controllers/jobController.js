@@ -2,6 +2,8 @@
 
 const db = require('../config/database');
 const { embedJobDescription, saveJobEmbedding } = require('../services/embeddingService');
+// 👇 THÊM: Import createNotification
+const { createNotification } = require('./notificationController');
 
 // Create a new job (Employer only)
 const createJob = async (req, res) => {
@@ -20,7 +22,6 @@ const createJob = async (req, res) => {
         console.log('✅ Job created, ID:', jobId);
 
         // 👇 THÊM: Gửi notification cho tất cả followers
-        const { createNotification } = require('./notificationController');
         
         // Lấy company_name
         const employerResult = await db.query('SELECT company_name FROM users WHERE id = $1', [employer_id]);
@@ -62,11 +63,15 @@ const updateJob = async (req, res) => {
     const employer_id = req.user.id;
 
     try {
-        // Kiểm tra quyền sở hữu
-        const checkOwner = await db.query('SELECT id FROM jobs WHERE id = $1 AND employer_id = $2', [id, employer_id]);
+        // 👇 SỬA: Lấy thêm 'status' và 'title' cũ để so sánh
+        const checkOwner = await db.query('SELECT id, status, title FROM jobs WHERE id = $1 AND employer_id = $2', [id, employer_id]);
+        
         if (checkOwner.rows.length === 0) {
             return res.status(403).json({ error: 'Not authorized to edit this job' });
         }
+
+        const oldStatus = checkOwner.rows[0].status;
+        const jobTitle = checkOwner.rows[0].title;
 
         const result = await db.query(
             `UPDATE jobs 
@@ -75,6 +80,35 @@ const updateJob = async (req, res) => {
              RETURNING *`,
             [title, description, location, salary_range, employment_type, deadline, status, id]
         );
+
+        // 👇 LOGIC MỚI: Gửi thông báo nếu trạng thái thay đổi sang 'closed' hoặc 'draft'
+        if (status !== oldStatus && (status === 'closed' || status === 'draft')) {
+            console.log(`ℹ️ Job ${id} status changed to ${status}. Notifying applicants...`);
+
+            // 1. Lấy danh sách tất cả candidate đã apply vào job này
+            const applicantsResult = await db.query(
+                'SELECT candidate_id FROM applications WHERE job_id = $1',
+                [id]
+            );
+
+            // 2. Tạo nội dung thông báo
+            const notifTitle = status === 'closed' ? '⛔ Job Closed' : '🔒 Job Unavailable';
+            const notifMessage = `The job "${jobTitle}" you applied for has been ${status === 'closed' ? 'closed' : 'moved to draft'} by the employer.`;
+
+            // 3. Gửi thông báo cho từng người
+            const notificationPromises = applicantsResult.rows.map(app => 
+                createNotification(
+                    app.candidate_id,
+                    'job_status_change',
+                    notifTitle,
+                    notifMessage,
+                    '/my-applications' // Link về trang quản lý đơn của ứng viên
+                )
+            );
+
+            await Promise.all(notificationPromises);
+            console.log(`✅ Sent notifications to ${applicantsResult.rows.length} applicants.`);
+        }
 
         res.json(result.rows[0]);
     } catch (error) {
